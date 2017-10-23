@@ -1,0 +1,11 @@
+preprocessed_rendering_kernel.cl
+preprocessed_rendering_kernel_dl.cl
+smallptGPU
+smallptCPU
+path-tracer
+*.o
+build/
+image.ppm
+path-tracer.depend
+path-tracer.layout
+
