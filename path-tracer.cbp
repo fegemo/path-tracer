@@ -12,13 +12,51 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Compiler>
+					<Add option="-O3" />
+					<Add option="-Wall" />
 					<Add option="-g" />
+					<Add option="-msse2 -mfpmath=sse -ftree-vectorize -funroll-loops" />
+					<Add directory="/usr/local/cuda/include" />
 				</Compiler>
+				<Linker>
+					<Add library="m" />
+					<Add library="glut" />
+					<Add library="GL" />
+					<Add library="OpenCL" />
+					<Add directory="/usr/local/cuda/lib64" />
+				</Linker>
+				<ExtraCommands>
+					<Add before="cpp &lt; rendering_kernel.cl &gt;preprocessed_rendering_kernel.cl" />
+					<Add before="cpp &lt; rendering_kernel_dl.cl &gt;preprocessed_rendering_kernel_dl.cl" />
+				</ExtraCommands>
 			</Target>
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
+		<Unit filename="camera.h" />
+		<Unit filename="displayfunc.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="displayfunc.h" />
+		<Unit filename="geom.h" />
+		<Unit filename="geomfunc.h" />
+		<Unit filename="rendering_kernel.cl">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Unit filename="rendering_kernel_dl.cl">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Unit filename="scene.h" />
+		<Unit filename="simplernd.h" />
+		<Unit filename="smallptCPU.c">
+			<Option compilerVar="CC" />
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Unit filename="smallptGPU.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="vec.h" />
 		<Extensions>
 			<envvars />
 			<code_completion />
