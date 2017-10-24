@@ -43,11 +43,11 @@ extern char captionBuffer[256];
 
 extern int amiSmallptCPU;
 
-extern void InitGlut(int argc, char *argv[], char *windowTittle);
-extern double WallClockTime();
+extern void initGlut(int argc, char *argv[], char *windowTittle);
+extern double wallClockTime();
 
-extern void ReadScene(char *);
-extern void UpdateCamera();
+extern void readScene(char *);
+extern void updateCamera();
 
 #endif	/* _DISPLAYFUNC_H */
 

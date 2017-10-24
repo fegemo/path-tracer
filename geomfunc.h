@@ -35,7 +35,7 @@ OCL_CONSTANT_BUFFER
 #endif
 	const Sphere *s,
 	const Ray *r) { /* returns distance, 0 if nohit */
-	Vec op; /* Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0 */
+	vec op; /* Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0 */
 	vsub(op, s->p, r->o);
 
 	float b = vdot(op, r->d);
@@ -58,7 +58,7 @@ OCL_CONSTANT_BUFFER
 	}
 }
 
-static void UniformSampleSphere(const float u1, const float u2, Vec *v) {
+static void UniformSampleSphere(const float u1, const float u2, vec *v) {
 	const float zz = 1.f - 2.f * u1;
 	const float r = sqrt(max(0.f, 1.f - zz * zz));
 	const float phi = 2.f * FLOAT_PI * u2;
@@ -116,9 +116,9 @@ OCL_CONSTANT_BUFFER
 	const Sphere *spheres,
 	const unsigned int sphereCount,
 	unsigned int *seed0, unsigned int *seed1,
-	const Vec *hitPoint,
-	const Vec *normal,
-	Vec *result) {
+	const vec *hitPoint,
+	const vec *normal,
+	vec *result) {
 	vclr(*result);
 
 	/* For each light */
@@ -134,9 +134,9 @@ OCL_CONSTANT_BUFFER
 			shadowRay.o = *hitPoint;
 
 			/* Choose a point over the light source */
-			Vec unitSpherePoint;
+			vec unitSpherePoint;
 			UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
-			Vec spherePoint;
+			vec spherePoint;
 			vsmul(spherePoint, light->rad, unitSpherePoint);
 			vadd(spherePoint, spherePoint, light->p);
 
@@ -155,7 +155,7 @@ OCL_CONSTANT_BUFFER
 			/* Check if the light is visible */
 			const float wi = vdot(shadowRay.d, *normal);
 			if ((wi > 0.f) && (!IntersectP(spheres, sphereCount, &shadowRay, len - EPSILON))) {
-				Vec c; vassign(c, light->e);
+				vec c; vassign(c, light->e);
 				const float s = (4.f * FLOAT_PI * light->rad * light->rad) * wi * wo / (len *len);
 				vsmul(c, s, c);
 				vadd(*result, *result, c);
@@ -172,10 +172,10 @@ OCL_CONSTANT_BUFFER
 	const unsigned int sphereCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
-	Vec *result) {
+	vec *result) {
 	Ray currentRay; rassign(currentRay, *startRay);
-	Vec rad; vinit(rad, 0.f, 0.f, 0.f);
-	Vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
+	vec rad; vinit(rad, 0.f, 0.f, 0.f);
+	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
@@ -198,23 +198,23 @@ OCL_CONSTANT_BUFFER
 #endif
 		const Sphere *obj = &spheres[id]; /* the hit object */
 
-		Vec hitPoint;
+		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);
 		vadd(hitPoint, currentRay.o, hitPoint);
 
-		Vec normal;
+		vec normal;
 		vsub(normal, hitPoint, obj->p);
 		vnorm(normal);
 
 		const float dp = vdot(normal, currentRay.d);
 
-		Vec nl;
+		vec nl;
 		// SIMT optimization
 		const float invSignDP = -1.f * sign(dp);
 		vsmul(nl, invSignDP, normal);
 
 		/* Add emitted light */
-		Vec eCol; vassign(eCol, obj->e);
+		vec eCol; vassign(eCol, obj->e);
 		if (!viszero(eCol)) {
 			if (specularBounce) {
 				vsmul(eCol, fabs(dp), eCol);
@@ -232,7 +232,7 @@ OCL_CONSTANT_BUFFER
 
 			/* Direct lighting component */
 
-			Vec Ld;
+			vec Ld;
 			SampleLights(spheres, sphereCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
@@ -243,9 +243,9 @@ OCL_CONSTANT_BUFFER
 			float r2 = GetRandom(seed0, seed1);
 			float r2s = sqrt(r2);
 
-			Vec w; vassign(w, nl);
+			vec w; vassign(w, nl);
 
-			Vec u, a;
+			vec u, a;
 			if (fabs(w.x) > .1f) {
 				vinit(a, 0.f, 1.f, 0.f);
 			} else {
@@ -254,10 +254,10 @@ OCL_CONSTANT_BUFFER
 			vxcross(u, a, w);
 			vnorm(u);
 
-			Vec v;
+			vec v;
 			vxcross(v, w, u);
 
-			Vec newDir;
+			vec newDir;
 			vsmul(u, cos(r1) * r2s, u);
 			vsmul(v, sin(r1) * r2s, v);
 			vadd(newDir, u, v);
@@ -270,7 +270,7 @@ OCL_CONSTANT_BUFFER
 		} else if (obj->refl == SPEC) { /* Ideal SPECULAR reflection */
 			specularBounce = 1;
 
-			Vec newDir;
+			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
@@ -281,7 +281,7 @@ OCL_CONSTANT_BUFFER
 		} else {
 			specularBounce = 1;
 
-			Vec newDir;
+			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
@@ -302,9 +302,9 @@ OCL_CONSTANT_BUFFER
 			}
 
 			float kk = (into ? 1 : -1) * (ddn * nnt + sqrt(cos2t));
-			Vec nkk;
+			vec nkk;
 			vsmul(nkk, kk, normal);
-			Vec transDir;
+			vec transDir;
 			vsmul(transDir, nnt, currentRay.d);
 			vsub(transDir, transDir, nkk);
 			vnorm(transDir);
@@ -345,10 +345,10 @@ OCL_CONSTANT_BUFFER
 	const unsigned int sphereCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
-	Vec *result) {
+	vec *result) {
 	Ray currentRay; rassign(currentRay, *startRay);
-	Vec rad; vinit(rad, 0.f, 0.f, 0.f);
-	Vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
+	vec rad; vinit(rad, 0.f, 0.f, 0.f);
+	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
@@ -371,23 +371,23 @@ OCL_CONSTANT_BUFFER
 #endif
 		const Sphere *obj = &spheres[id]; /* the hit object */
 
-		Vec hitPoint;
+		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);
 		vadd(hitPoint, currentRay.o, hitPoint);
 
-		Vec normal;
+		vec normal;
 		vsub(normal, hitPoint, obj->p);
 		vnorm(normal);
 
 		const float dp = vdot(normal, currentRay.d);
 
-		Vec nl;
+		vec nl;
 		// SIMT optimization
 		const float invSignDP = -1.f * sign(dp);
 		vsmul(nl, invSignDP, normal);
 
 		/* Add emitted light */
-		Vec eCol; vassign(eCol, obj->e);
+		vec eCol; vassign(eCol, obj->e);
 		if (!viszero(eCol)) {
 			if (specularBounce) {
 				vsmul(eCol, fabs(dp), eCol);
@@ -405,7 +405,7 @@ OCL_CONSTANT_BUFFER
 
 			/* Direct lighting component */
 
-			Vec Ld;
+			vec Ld;
 			SampleLights(spheres, sphereCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
@@ -415,7 +415,7 @@ OCL_CONSTANT_BUFFER
 		} else if (obj->refl == SPEC) { /* Ideal SPECULAR reflection */
 			specularBounce = 1;
 
-			Vec newDir;
+			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
@@ -426,7 +426,7 @@ OCL_CONSTANT_BUFFER
 		} else {
 			specularBounce = 1;
 
-			Vec newDir;
+			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
@@ -447,9 +447,9 @@ OCL_CONSTANT_BUFFER
 			}
 
 			float kk = (into ? 1 : -1) * (ddn * nnt + sqrt(cos2t));
-			Vec nkk;
+			vec nkk;
 			vsmul(nkk, kk, normal);
-			Vec transDir;
+			vec transDir;
 			vsmul(transDir, nnt, currentRay.d);
 			vsub(transDir, transDir, nkk);
 			vnorm(transDir);

@@ -36,13 +36,13 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 	const float kcx = (x + r1) * invWidth - .5f;
 	const float kcy = (y + r2) * invHeight - .5f;
 
-	Vec rdir;
+	vec rdir;
 	vinit(rdir,
 			camera->x.x * kcx + camera->y.x * kcy + camera->dir.x,
 			camera->x.y * kcx + camera->y.y * kcy + camera->dir.y,
 			camera->x.z * kcx + camera->y.z * kcy + camera->dir.z);
 
-	Vec rorig;
+	vec rorig;
 	vsmul(rorig, 0.1f, rdir);
 	vadd(rorig, rorig, camera->orig)
 
@@ -50,8 +50,8 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 	rinit(*ray, rorig, rdir);
 }
 
-__kernel void RadianceGPU(
-    __global Vec *colors, __global unsigned int *seedsInput,
+__kernel void radianceGPU(
+    __global vec *colors, __global unsigned int *seedsInput,
 	OCL_CONSTANT_BUFFER Sphere *sphere, OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int sphereCount,
 	const int width, const int height,
@@ -73,7 +73,7 @@ __kernel void RadianceGPU(
 	Ray ray;
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
-	Vec r;
+	vec r;
 	RadianceDirectLighting(sphere, sphereCount, &ray, &seed0, &seed1, &r);
 
 	const int i = (height - y - 1) * width + x;

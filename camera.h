@@ -28,9 +28,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef struct {
 	/* User defined values */
-	Vec orig, target;
+	vec orig, target;
 	/* Calculated values */
-	Vec dir, x, y;
+	vec dir, x, y;
 } Camera;
 
 #endif	/* _CAMERA_H */

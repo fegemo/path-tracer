@@ -39,23 +39,23 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 int workGroupSize = 1;
 
-static Vec *colors;
+static vec *colors;
 static unsigned int *seeds;
 Camera camera;
 static int currentSample = 0;
 Sphere *spheres;
 unsigned int sphereCount;
 
-void FreeBuffers() {
+void freeBuffers() {
 	free(seeds);
 	free(colors);
 	free(pixels);
 }
 
-void AllocateBuffers() {
+void allocateBuffers() {
 	const int pixelCount = height * width ;
 	int i;
-	colors = malloc(sizeof(Vec[pixelCount]));
+	colors = malloc(sizeof(vec[pixelCount]));
 
 	seeds = malloc(sizeof(unsigned int[pixelCount * 2]));
 	for (i = 0; i < pixelCount * 2; i++) {
@@ -67,8 +67,8 @@ void AllocateBuffers() {
 	pixels = malloc(sizeof(unsigned int[pixelCount]));
 }
 
-void UpdateRendering(void) {
-	double startTime = WallClockTime();
+void updateRendering(void) {
+	double startTime = wallClockTime();
 
 	const float invWidth = 1.f / width;
 	const float invHeight = 1.f / height;
@@ -84,19 +84,19 @@ void UpdateRendering(void) {
 			const float kcx = (x + r1) * invWidth - .5f;
 			const float kcy = (y + r2) * invHeight - .5f;
 
-			Vec rdir;
+			vec rdir;
 			vinit(rdir,
 				camera.x.x * kcx + camera.y.x * kcy + camera.dir.x,
 				camera.x.y * kcx + camera.y.y * kcy + camera.dir.y,
 				camera.x.z * kcx + camera.y.z * kcy + camera.dir.z);
 
-			Vec rorig;
+			vec rorig;
 			vsmul(rorig, 0.1f, rdir);
 			vadd(rorig, rorig, camera.orig)
 
 			vnorm(rdir);
 			const Ray ray = {rorig, rdir};
-			Vec r;
+			vec r;
 			RadiancePathTracing(spheres, sphereCount, &ray,
 					&seeds[i2], &seeds[i2 + 1], &r);
 
@@ -116,7 +116,7 @@ void UpdateRendering(void) {
 		}
 	}
 
-	const float elapsedTime = WallClockTime() - startTime;
+	const float elapsedTime = wallClockTime() - startTime;
 	const float sampleSec = height * width / elapsedTime;
 	sprintf(captionBuffer, "Rendering time %.3f sec (pass %d)  Sample/sec  %.1fK\n",
 		elapsedTime, currentSample, sampleSec / 1000.f);
@@ -124,20 +124,20 @@ void UpdateRendering(void) {
 	currentSample++;
 }
 
-void ReInitScene() {
+void reInitSceneObjects() {
 	currentSample = 0;
 }
 
-void ReInit(const int reallocBuffers) {
+void reInitViewpointDependentBuffers(const int reallocBuffers) {
 	// Check if I have to reallocate buffers
 	if (reallocBuffers) {
-		FreeBuffers();
-		AllocateBuffers();
+		freeBuffers();
+		allocateBuffers();
 	}
 
-	UpdateCamera();
+	updateCamera();
 	currentSample = 0;
-	UpdateRendering();
+	updateRendering();
 }
 
 int main(int argc, char *argv[]) {
@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
 	if (argc == 4) {
 		width = atoi(argv[1]);
 		height = atoi(argv[2]);
-		ReadScene(argv[3]);
+		readScene(argv[3]);
 	} else if (argc == 1) {
 		spheres = CornellSpheres;
 		sphereCount = sizeof(CornellSpheres) / sizeof(Sphere);
@@ -159,15 +159,15 @@ int main(int argc, char *argv[]) {
 	} else
 		exit(-1);
 
-	UpdateCamera();
+	updateCamera();
 
 	/*------------------------------------------------------------------------*/
 
-	AllocateBuffers();
+	allocateBuffers();
 
 	/*------------------------------------------------------------------------*/
 
-	InitGlut(argc, argv, "SmallPT CPU V1.6 (Written by David Bucciarelli)");
+	initGlut(argc, argv, "SmallPT CPU V1.6 (Written by David Bucciarelli)");
 
     glutMainLoop( );
 

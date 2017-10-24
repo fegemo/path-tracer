@@ -26,7 +26,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 typedef struct {
 	float x, y, z; // position, also color (r,g,b)
-} Vec;
+} vec;
 
 #define vinit(v, a, b, c) { (v).x = a; (v).y = b; (v).z = c; }
 #define vassign(a, b) vinit(a, (b).x, (b).y, (b).z)

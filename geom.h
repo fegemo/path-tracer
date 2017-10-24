@@ -30,7 +30,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define FLOAT_PI 3.14159265358979323846f
 
 typedef struct {
-	Vec o, d;
+	vec o, d;
 } Ray;
 
 #define rinit(r, a, b) { vassign((r).o, a); vassign((r).d, b); }
@@ -42,7 +42,7 @@ enum Refl {
 
 typedef struct {
 	float rad; /* radius */
-	Vec p, e, c; /* position, emission, color */
+	vec p, e, c; /* position, emission, color */
 	enum Refl refl; /* reflection type (DIFFuse, SPECular, REFRactive) */
 } Sphere;
 

@@ -36,13 +36,13 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 	const float kcx = (x + r1) * invWidth - .5f;
 	const float kcy = (y + r2) * invHeight - .5f;
 
-	Vec rdir;
+	vec rdir;
 	vinit(rdir,
 			camera->x.x * kcx + camera->y.x * kcy + camera->dir.x,
 			camera->x.y * kcx + camera->y.y * kcy + camera->dir.y,
 			camera->x.z * kcx + camera->y.z * kcy + camera->dir.z);
 
-	Vec rorig;
+	vec rorig;
 	vsmul(rorig, 0.1f, rdir);
 	vadd(rorig, rorig, camera->orig)
 
@@ -50,8 +50,8 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 	rinit(*ray, rorig, rdir);
 }
 
-__kernel void RadianceGPU(
-    __global Vec *colors, __global unsigned int *seedsInput,
+__kernel void radianceGPU(
+    __global vec *colors, __global unsigned int *seedsInput,
 	OCL_CONSTANT_BUFFER Sphere *sphere, OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int sphereCount,
 	const int width, const int height,
@@ -73,7 +73,7 @@ __kernel void RadianceGPU(
 	Ray ray;
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
-	Vec r;
+	vec r;
 	RadiancePathTracing(sphere, sphereCount, &ray, &seed0, &seed1, &r);
 
 	const int i = (height - y - 1) * width + x;
@@ -88,9 +88,9 @@ __kernel void RadianceGPU(
 		colors[i].z = (colors[i].z * k1  + r.z) * k2;
 	}
 
-	pixels[y * width + x] = toInt(colors[i].x) |
-			(toInt(colors[i].y) << 8) |
-			(toInt(colors[i].z) << 16);
+	pixels[y * width + x] = toInt(colors[i].x) |    // blue
+			(toInt(colors[i].y) << 8) |             // green
+			(toInt(colors[i].z) << 16);             // red... and alpha?
 
 	seedsInput[gid2] = seed0;
 	seedsInput[gid2 + 1] = seed1;

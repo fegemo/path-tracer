@@ -61,14 +61,17 @@ static cl_kernel kernel;
 static unsigned int workGroupSize = 1;
 static char *kernelFileName = "rendering_kernel.cl";
 
-static Vec *colors;
+static vec *colors;
 static unsigned int *seeds;
 Camera camera;
 static int currentSample = 0;
 Sphere *spheres;
 unsigned int sphereCount;
 
-static void FreeBuffers() {
+///
+/// Frees the color, pixel and random seeds buffer from vram and ram.
+///
+static void freeBuffers() {
 	cl_int status = clReleaseMemObject(colorBuffer);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to release OpenCL color buffer: %d\n", status);
@@ -92,11 +95,15 @@ static void FreeBuffers() {
 	free(pixels);
 }
 
-static void AllocateBuffers() {
+///
+/// Allocates the output buffers necessary to show the partial results using glut.
+///
+static void allocateOutputBuffers() {
 	const int pixelCount = width * height;
 	int i;
-	colors = (Vec *)malloc(sizeof(Vec) * pixelCount);
+	colors = (vec *)malloc(sizeof(vec) * pixelCount);
 
+	// generates 2 random numbers per pixel (not sure what it is used for)
 	seeds = (unsigned int *)malloc(sizeof(unsigned int) * pixelCount * 2);
 	for (i = 0; i < pixelCount * 2; i++) {
 		seeds[i] = rand();
@@ -104,13 +111,16 @@ static void AllocateBuffers() {
 			seeds[i] = 2;
 	}
 
+	// array of indices of pixels (not sure what for)
 	pixels = (unsigned int *)malloc(sizeof(unsigned int) * pixelCount);
-	// Test colors
-	for(i = 0; i < pixelCount; ++i)
+	for (i = 0; i < pixelCount; ++i) {
 		pixels[i] = i;
+	}
 
+
+	// creates the color buffer, from which the opencl program can write (results) and read (what for?)
 	cl_int status;
-	cl_uint sizeBytes = sizeof(Vec) * width * height;
+	cl_uint sizeBytes = sizeof(vec) * width * height;
     colorBuffer = clCreateBuffer(
             context,
             CL_MEM_READ_WRITE,
@@ -122,6 +132,7 @@ static void AllocateBuffers() {
 		exit(-1);
     }
 
+    // creates a buffer of pixel indices, which the opencl can only read (what for?)
 	sizeBytes = sizeof(unsigned int) * width * height;
     pixelBuffer = clCreateBuffer(
             context,
@@ -134,6 +145,7 @@ static void AllocateBuffers() {
 		exit(-1);
     }
 
+    // creates a buffer with random seeds (2 x pixel), read/write (what for?)
 	sizeBytes = sizeof(unsigned int) * width * height * 2;
 	seedBuffer = clCreateBuffer(
             context,
@@ -145,6 +157,8 @@ static void AllocateBuffers() {
 		fprintf(stderr, "Failed to create OpenCL seed buffer: %d\n", status);
 		exit(-1);
     }
+
+    // writes the random seeds buffer to the vram
 	status = clEnqueueWriteBuffer(
 			commandQueue,
 			seedBuffer,
@@ -161,7 +175,10 @@ static void AllocateBuffers() {
 	}
 }
 
-static char *ReadSources(const char *fileName) {
+///
+/// Reads a file, by its file name, line by line and returns an array of null-terminated lines.
+///
+static char *readFileByLine(const char *fileName) {
 	FILE *file = fopen(fileName, "r");
 	if (!file) {
 		fprintf(stderr, "Failed to open file '%s'\n", fileName);
@@ -201,7 +218,10 @@ static char *ReadSources(const char *fileName) {
 
 }
 
-static void SetUpOpenCL() {
+///
+/// Sets up platorm, devices, context, command queue, buffers and kernel.
+///
+static void setUpOpenCL() {
 	cl_device_type dType;
 
 	if (useGPU)
@@ -209,10 +229,16 @@ static void SetUpOpenCL() {
 	else
 		dType = CL_DEVICE_TYPE_CPU;
 
-	// Select the platform
+
+	// selecting the platform
+    // ----------------------
 
     cl_uint numPlatforms;
 	cl_platform_id platform = NULL;
+
+	// num_entries (amount of platforms we want), platforms (their ids), num_platorms (amount of available)
+	// in this case, we want to know how many we have only (hence [0, NULL, &numPlatforms])
+	// so we can later fetch the details of the first one
 	cl_int status = clGetPlatformIDs(0, NULL, &numPlatforms);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to get OpenCL platforms\n");
@@ -221,6 +247,7 @@ static void SetUpOpenCL() {
 
 	if (numPlatforms > 0) {
 		cl_platform_id *platforms = (cl_platform_id *)malloc(sizeof(cl_platform_id) * numPlatforms);
+		// now we query again to fetch the available platforms' ids...
 		status = clGetPlatformIDs(numPlatforms, platforms, NULL);
 			if (status != CL_SUCCESS) {
 			fprintf(stderr, "Failed to get OpenCL platform IDs\n");
@@ -230,29 +257,31 @@ static void SetUpOpenCL() {
 		unsigned int i;
 		for (i = 0; i < numPlatforms; ++i) {
 			char pbuf[100];
+			// now we query details for each platform, in particular, its vendor (eg, NVIDIA)
 			status = clGetPlatformInfo(platforms[i],
 					CL_PLATFORM_VENDOR,
 					sizeof(pbuf),
 					pbuf,
 					NULL);
 
-			status = clGetPlatformIDs(numPlatforms, platforms, NULL);
-			if (status != CL_SUCCESS) {
-				fprintf(stderr, "Failed to get OpenCL platform IDs\n");
-				exit(-1);
-			}
-
 			fprintf(stderr, "OpenCL Platform %d: %s\n", i, pbuf);
 		}
 
+		// we've just listed (printed) all of the available platforms...
+		// now we simply get the first platform that was returned and that's it
 		platform = platforms[0];
 		free(platforms);
 	}
 
-	// Select the device
+
+	// selecting the device
+	// --------------------
 
 	cl_device_id devices[32];
 	cl_uint deviceCount;
+	// we query which available devices this platform has...
+	// platform (id), device_type (cpu, gpu etc.), num_entries (max devices), devices (array of ids),
+	//      num_devices (actual number of devices found on this platform)
 	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 32, devices, &deviceCount);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to get OpenCL device IDs\n");
@@ -264,6 +293,8 @@ static void SetUpOpenCL() {
 	unsigned int i;
 	for (i = 0; i < deviceCount; ++i) {
 		cl_device_type type = 0;
+
+		// query which type this device has and puts it on type...
 		status = clGetDeviceInfo(devices[i],
 				CL_DEVICE_TYPE,
 				sizeof(cl_device_type),
@@ -275,6 +306,7 @@ static void SetUpOpenCL() {
 		}
 
 		char *stype;
+		// generates a string with the device type so we can printf it
 		switch (type) {
 			case CL_DEVICE_TYPE_ALL:
 				stype = "TYPE_ALL";
@@ -284,12 +316,14 @@ static void SetUpOpenCL() {
 				break;
 			case CL_DEVICE_TYPE_CPU:
 				stype = "TYPE_CPU";
+			    // we found a CPU, so we can use it and proceed with this program (if we're !useGPU)
 				if (!useGPU && !deviceFound) {
 					selectedDevice = devices[i];
 					deviceFound = 1;
 				}
 				break;
 			case CL_DEVICE_TYPE_GPU:
+			    // we found a GPU, so we can use it and proceed with this program
 				stype = "TYPE_GPU";
 				if (useGPU && !deviceFound) {
 					selectedDevice = devices[i];
@@ -302,6 +336,7 @@ static void SetUpOpenCL() {
 		}
 		fprintf(stderr, "OpenCL Device %d: Type = %s\n", i, stype);
 
+		// now we query the name of this device
 		char buf[256];
 		status = clGetDeviceInfo(devices[i],
 				CL_DEVICE_NAME,
@@ -315,6 +350,7 @@ static void SetUpOpenCL() {
 
 		fprintf(stderr, "OpenCL Device %d: Name = %s\n", i, buf);
 
+        // and now we get the number of compute units of this device and printf it
 		cl_uint units = 0;
 		status = clGetDeviceInfo(devices[i],
 				CL_DEVICE_MAX_COMPUTE_UNITS,
@@ -328,6 +364,7 @@ static void SetUpOpenCL() {
 
 		fprintf(stderr, "OpenCL Device %d: Compute units = %u\n", i, units);
 
+		// finally, we query and printf the largest work group of this device
 		size_t gsize = 0;
 		status = clGetDeviceInfo(devices[i],
 				CL_DEVICE_MAX_WORK_GROUP_SIZE,
@@ -347,7 +384,9 @@ static void SetUpOpenCL() {
 		exit(-1);
 	}
 
-	// Create the context
+
+	// creating the context
+	// --------------------
 
 	cl_context_properties cps[3] = {
 		CL_CONTEXT_PLATFORM,
@@ -356,6 +395,9 @@ static void SetUpOpenCL() {
 	};
 
 	cl_context_properties *cprops = (NULL == platform) ? NULL : cps;
+	// creates a context, which is a configured device and a queue of commands
+	// properties (platform we're using etc.), num_devices (how many devices we want to use),
+	// devices (array of devices to be used), pfn_notify (error callback), user_data, errcode_ret
 	context = clCreateContext(
 			cprops,
 			1,
@@ -368,7 +410,7 @@ static void SetUpOpenCL() {
 		exit(-1);
 	}
 
-    /* Get the device list data */
+    // checks if the context was properly created by querying the devices
 	size_t deviceListSize;
     status = clGetContextInfo(
             context,
@@ -381,7 +423,7 @@ static void SetUpOpenCL() {
 		exit(-1);
     }
 
-	/* Print devices list */
+	// printfs the devices being used in the context we've just created
 	for (i = 0; i < deviceListSize / sizeof(cl_device_id); ++i) {
 		cl_device_type type = 0;
 		status = clGetDeviceInfo(devices[i],
@@ -454,19 +496,26 @@ static void SetUpOpenCL() {
 		fprintf(stderr, "[SELECTED] OpenCL Device %d: Max. work group size = %d\n", i, (unsigned int)gsize);
 	}
 
-	cl_command_queue_properties prop = 0;
+	// creates a command queue and attaches it to our context
+	// context, device (the device that will execute this queue), properties (), errcode_ret
 	commandQueue = clCreateCommandQueue(
 			context,
 			devices[0],
-			prop,
+			NULL,
 			&status);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to create OpenCL command queue: %d\n", status);
 		exit(-1);
     }
 
-	/*------------------------------------------------------------------------*/
 
+
+    // creating buffers for our objects
+    // --------------------------------
+
+    // allocates space on the device memory to hold the spheres that compose the scene
+    // context (id), flags (rw, r, w etc), size (bytes of the buffer to be allocated),
+    //      host_ptr (pointer to regular memory - a bit confusing...), errcode_ret
 	sphereBuffer = clCreateBuffer(
             context,
 #ifdef __APPLE__
@@ -481,6 +530,14 @@ static void SetUpOpenCL() {
 		fprintf(stderr, "Failed to create OpenCL scene buffer: %d\n", status);
 		exit(-1);
     }
+
+    // now we issue a command on the queue that will write an array from regular memory (ram)
+    // into the device's memory (vram)
+    // command_queue (id), buffer (on which buffer to write), blocking_write (should block access
+    //      to the src memory?), offset (from the src buffer), size (in bytes of src buffer),
+    //      ptr (to the source buffer in ram), num_events_in_wait_list and event_wait_list
+    //      (should we wait for these events to finish before exec'ing this command?),
+    //      event (that represents this command - returned)
 	status = clEnqueueWriteBuffer(
 			commandQueue,
 			sphereBuffer,
@@ -496,6 +553,8 @@ static void SetUpOpenCL() {
 		exit(-1);
 	}
 
+
+    // creates a buffer to hold information regarding the camera (eye, target)
 	cameraBuffer = clCreateBuffer(
             context,
 #ifdef __APPLE__
@@ -525,12 +584,16 @@ static void SetUpOpenCL() {
 		exit(-1);
 	}
 
-	AllocateBuffers();
+	// allocates some buffers to hold the output from the opencl program
+	allocateOutputBuffers();
 
-	/*------------------------------------------------------------------------*/
 
-	/* Create the kernel program */
-	const char *sources = ReadSources(kernelFileName);
+	// creating the program from its source
+	// ------------------------------------
+
+	const char *sources = readFileByLine(kernelFileName);
+	// context, count (number of lines in source), strings (array of lines),
+	//      lengths (array of line lengths or NULL, if they're null-terminated), errcode_ret
 	program = clCreateProgramWithSource(
         context,
         1,
@@ -545,6 +608,9 @@ static void SetUpOpenCL() {
 #ifdef __APPLE__
 	status = clBuildProgram(program, 1, devices, "-I. -D__APPLE__", NULL, NULL);
 #else
+    // builds (compiles and links) the opencl program
+    // program (id from createProgram), num_devices (devices that will run it),
+    //      device_list, options ('command line'), ptn_notify (error cllbck), user_data
 	status = clBuildProgram(program, 1, devices, "-I. ", NULL, NULL);
 #endif
 	if (status != CL_SUCCESS) {
@@ -581,13 +647,16 @@ static void SetUpOpenCL() {
 		exit(-1);
     }
 
-	kernel = clCreateKernel(program, "RadianceGPU", &status);
+    // creates our main kernel from the __kernel function called 'radianceGPU'
+    // program (id), kernel_name (name of the __kernel function), errcode_ret
+	kernel = clCreateKernel(program, "radianceGPU", &status);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to create OpenCL kernel: %d\n", status);
 		exit(-1);
     }
 
-	// LordCRC's patch for better workGroupSize
+	// determines the best work group size to use based on what the opencl driver thinks best
+	// for the specific kernel we're going to execute (eg, how many registers it uses)
 	size_t gsize = 0;
 	status = clGetKernelWorkGroupInfo(kernel,
 			devices[0],
@@ -595,6 +664,7 @@ static void SetUpOpenCL() {
 			sizeof(size_t),
 			&gsize,
 			NULL);
+
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to get OpenCL kernel work group size info: %d\n", status);
 		exit(-1);
@@ -609,15 +679,26 @@ static void SetUpOpenCL() {
 	}
 }
 
-static void ExecuteKernel() {
-	/* Enqueue a kernel run call */
+///
+/// Asks the device to execute our kernel, properly configured considering the work-groups and items.
+///
+static void executeKernel() {
+    // globalThreads is the number of workGroups we need to compute all pixels 1 time
 	size_t globalThreads[1];
 	globalThreads[0] = width * height;
-	if (globalThreads[0] % workGroupSize != 0)
+	if (globalThreads[0] % workGroupSize != 0) {
 		globalThreads[0] = (globalThreads[0] / workGroupSize + 1) * workGroupSize;
+        // suppose: 800x600 (ie, 480.000) and 1024 workGroupSize
+        // numberOfWorkGroups = (479.700) * 1024 == 479.232	workgroups
+	}
+	// localThreads is the number of work-items a work-group has
 	size_t localThreads[1];
 	localThreads[0] = workGroupSize;
 
+	// adds a command to execute our kernel
+	// command_queue (id), kernel (id), work_dim (number of dimensions we'll provide the work-items),
+	//      global_work_offset, global_work_size (number of global work-groups we need),
+	//      local_work_size (how many work-items make a work-group - ), events...
 	cl_int status = clEnqueueNDRangeKernel(
 			commandQueue,
 			kernel,
@@ -634,11 +715,18 @@ static void ExecuteKernel() {
 	}
 }
 
-void UpdateRendering() {
-	double startTime = WallClockTime();
+///
+/// Asks the device to draw as many times as it can in 500ms by calling executeKernel() with the
+/// updated values. Then, updates the color (output) buffer from vram to ram so glut redraws an
+/// updated color buffer.
+///
+void updateRendering() {
+	double startTime = wallClockTime();
 	int startSampleCount = currentSample;
 
-	/* Set kernel arguments */
+    // sets the arguments for the kernel (the color buffer)
+    // kernel (id), arg_index (index of this argument in the kernel function),
+    //      arg_size (bytes of this argument), arg_value
 	cl_int status = clSetKernelArg(
 			kernel,
 			0,
@@ -649,6 +737,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// now, sets the value for the random seed buffer
 	status = clSetKernelArg(
 			kernel,
 			1,
@@ -659,6 +748,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// now, for the sphere buffer
 	status = clSetKernelArg(
 			kernel,
 			2,
@@ -669,6 +759,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// and the camera buffer
 	status = clSetKernelArg(
 			kernel,
 			3,
@@ -679,6 +770,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// and the sphere count
 	status = clSetKernelArg(
 			kernel,
 			4,
@@ -689,6 +781,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// and the scene width
 	status = clSetKernelArg(
 			kernel,
 			5,
@@ -699,6 +792,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// and height
 	status = clSetKernelArg(
 			kernel,
 			6,
@@ -709,6 +803,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// sets the value of the currentSample (what is this) in the kernel
 	status = clSetKernelArg(
 			kernel,
 			7,
@@ -719,6 +814,7 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
+	// sets the value of the pixel buffer (what is being drawn by opengl, gamma-corrected and in 4 bytes)
 	status = clSetKernelArg(
 			kernel,
 			8,
@@ -729,29 +825,34 @@ void UpdateRendering() {
 		exit(-1);
 	}
 
-	//--------------------------------------------------------------------------
 
+	// asks the device to execute the kernel
 	if (currentSample < 20) {
-		ExecuteKernel();
+		executeKernel();
 		currentSample++;
 	} else {
-		/* After first 20 samples, continue to execute kernels for more and more time */
+		// if we are past the initial 20 samples, execute kernels more frequently
 		const float k = min(currentSample - 20, 100) / 100.f;
 		const float tresholdTime = 0.5f * k;
 		for (;;) {
-			ExecuteKernel();
+			executeKernel();
+
+			// waits for the queue to be fully executed (ie, become empty)
 			clFinish(commandQueue);
 			currentSample++;
 
-			const float elapsedTime = WallClockTime() - startTime;
+			// keeps executing the kernel for more samples for at most 500ms, then proceed
+			const float elapsedTime = wallClockTime() - startTime;
 			if (elapsedTime > tresholdTime)
 				break;
 		}
 	}
 
-	//--------------------------------------------------------------------------
-
-	/* Enqueue readBuffer */
+	// now that we have executed the kernel as many times as we could on 500ms, we want to read
+	// the results back from the opencl program (vram -> ram)
+	// command_queue (id), buffer (memory address of what we want to read),
+    //      blocking_read (should block the program here?), offset (on the src buffer),
+    //      size (in bytes of the data being read), ptr (pointer to dest in ram), events...
 	status = clEnqueueReadBuffer(
 			commandQueue,
 			pixelBuffer,
@@ -769,19 +870,22 @@ void UpdateRendering() {
 
 	/*------------------------------------------------------------------------*/
 
-	const double elapsedTime = WallClockTime() - startTime;
+	// time spent on this "glut frame"... updates the string samples/sec to render it
+	const double elapsedTime = wallClockTime() - startTime;
 	const int samples = currentSample - startSampleCount;
 	const double sampleSec = samples * height * width / elapsedTime;
 	sprintf(captionBuffer, "Rendering time %.3f sec (pass %d)  Sample/sec  %.1fK\n",
 			elapsedTime, currentSample, sampleSec / 1000.f);
 }
 
-void ReInitScene() {
+///
+/// Reinitializes the objects in the scene, called when the user changes them.
+///
+void reInitSceneObjects() {
 	currentSample = 0;
 
-	// Redownload the scene
-
-	cl_int status = clEnqueueWriteBuffer(
+	// writes the scene objects buffer to vram again
+    cl_int status = clEnqueueWriteBuffer(
 			commandQueue,
 			sphereBuffer,
 			CL_TRUE,
@@ -797,15 +901,20 @@ void ReInitScene() {
 	}
 }
 
-void ReInit(const int reallocBuffers) {
-	// Check if I have to reallocate buffers
+///
+/// Reinitializes rendering the scene camera, called when the viewpoint (camera) has changed.
+///
+void reInitViewpointDependentBuffers(const int reallocBuffers) {
+    // when ' ' is pressed we want to throw away all our buffers and realloc them
 	if (reallocBuffers) {
-		FreeBuffers();
-		UpdateCamera();
-		AllocateBuffers();
-	} else
-		UpdateCamera();
+		freeBuffers();
+		updateCamera();
+		allocateOutputBuffers();
+	} else {
+		updateCamera();
+	}
 
+	// writes the camera buffer back to vram, as we've just changed it on the ram
 	cl_int status = clEnqueueWriteBuffer(
 			commandQueue,
 			cameraBuffer,
@@ -824,6 +933,10 @@ void ReInit(const int reallocBuffers) {
 	currentSample = 0;
 }
 
+///
+/// Main function. Checks for cmd arguments, sets up the camera, opencl and glut.
+/// Then delivers to glut (glutMainLoop).
+///
 int main(int argc, char *argv[]) {
 	amiSmallptCPU = 0;
 
@@ -836,25 +949,22 @@ int main(int argc, char *argv[]) {
 		kernelFileName = argv[3];
 		width = atoi(argv[4]);
 		height = atoi(argv[5]);
-		ReadScene(argv[6]);
+		readScene(argv[6]);
 	} else if (argc == 1) {
 		spheres = CornellSpheres;
 		sphereCount = sizeof(CornellSpheres) / sizeof(Sphere);
 
 		vinit(camera.orig, 50.f, 45.f, 205.6f);
 		vinit(camera.target, 50.f, 45 - 0.042612f, 204.6);
-	} else
+	} else {
 		exit(-1);
+    }
 
-	UpdateCamera();
+	updateCamera();
 
-	/*------------------------------------------------------------------------*/
+	setUpOpenCL();
 
-	SetUpOpenCL();
-
-	/*------------------------------------------------------------------------*/
-
-	InitGlut(argc, argv, "SmallPT GPU V1.6 (Written by David Bucciarelli)");
+	initGlut(argc, argv, "SmallPT GPU V1.6 (Written by David Bucciarelli)");
 
     glutMainLoop();
 
