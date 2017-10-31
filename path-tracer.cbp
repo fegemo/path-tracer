@@ -11,6 +11,8 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
+				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/cornell.scn" />
 				<Compiler>
 					<Add option="-O3" />
 					<Add option="-Wall" />
@@ -48,6 +50,12 @@
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
 		<Unit filename="scene.h" />
+		<Unit filename="scenes/caustic.scn" />
+		<Unit filename="scenes/caustic3.scn" />
+		<Unit filename="scenes/complex.scn" />
+		<Unit filename="scenes/cornell.scn" />
+		<Unit filename="scenes/cornell_large.scn" />
+		<Unit filename="scenes/simple.scn" />
 		<Unit filename="simplernd.h" />
 		<Unit filename="smallptCPU.c">
 			<Option compilerVar="CC" />

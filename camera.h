@@ -27,9 +27,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "vec.h"
 
 typedef struct {
-	/* User defined values */
+	// values defined by the scene/user interaction
 	vec orig, target;
-	/* Calculated values */
+	// values calculated from orig/target (direction, x and y basis vectors)
 	vec dir, x, y;
 } Camera;
 

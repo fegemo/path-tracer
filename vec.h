@@ -24,10 +24,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef _VEC_H
 #define	_VEC_H
 
+// vec is used for position, vector and color
 typedef struct {
-	float x, y, z; // position, also color (r,g,b)
+	float x, y, z;
 } vec;
 
+// common vertex operations
 #define vinit(v, a, b, c) { (v).x = a; (v).y = b; (v).z = c; }
 #define vassign(a, b) vinit(a, (b).x, (b).y, (b).z)
 #define vclr(v) vinit(v, 0.f, 0.f, 0.f)
@@ -60,6 +62,11 @@ typedef struct {
 #define OCL_CONSTANT_BUFFER __global
 #else
 #define OCL_CONSTANT_BUFFER __constant
+#endif
+
+#ifndef GPU_KERNEL
+#undef OCL_CONSTANT_BUFFER
+#define OCL_CONSTANT_BUFFER
 #endif
 
 #endif	/* _VEC_H */

@@ -30,10 +30,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef SMALLPT_GPU
 
 static float SphereIntersect(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *s,
+    OCL_CONSTANT_BUFFER const Sphere *s,
 	const Ray *r) { /* returns distance, 0 if nohit */
 	vec op; /* Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0 */
 	vsub(op, s->p, r->o);
@@ -58,29 +55,41 @@ OCL_CONSTANT_BUFFER
 	}
 }
 
+///
+/// finds a random point on a sphere
+///  u1, u2 are random [0,1]
+///  v is the output point
+///
+/// this is from pbrt page 664
 static void UniformSampleSphere(const float u1, const float u2, vec *v) {
+    // zz = [-1, 1]
 	const float zz = 1.f - 2.f * u1;
+	// r = [0, 1] (trending towards 1)
 	const float r = sqrt(max(0.f, 1.f - zz * zz));
+	// phi = [0, 2pi]
 	const float phi = 2.f * FLOAT_PI * u2;
+	// xx =
 	const float xx = r * cos(phi);
 	const float yy = r * sin(phi);
 
 	vinit(*v, xx, yy, zz);
 }
 
+///
+/// checks if a ray intersects an object in the scene and return the intersection information
+///
 static int Intersect(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *spheres,
+    OCL_CONSTANT_BUFFER const Sphere *spheres,
 	const unsigned int sphereCount,
 	const Ray *r,
 	float *t,
 	unsigned int *id) {
+
 	float inf = (*t) = 1e20f;
 
 	unsigned int i = sphereCount;
 	for (; i--;) {
+        // ASSUMES SPHERES
 		const float d = SphereIntersect(&spheres[i], r);
 		if ((d != 0.f) && (d < *t)) {
 			*t = d;
@@ -91,16 +100,23 @@ OCL_CONSTANT_BUFFER
 	return (*t < inf);
 }
 
+///
+/// checks if a ray intersects the the scene without calculating hitpoint, normal etc.
+///
 static int IntersectP(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *spheres,
+    // scene description
+    OCL_CONSTANT_BUFFER const Sphere *spheres,
 	const unsigned int sphereCount,
+	// the ray being cast
 	const Ray *r,
+	// the maximum distance
 	const float maxt) {
+
 	unsigned int i = sphereCount;
+
+	// iterates on the scene checking for intersection with the ray
 	for (; i--;) {
+        // ASSUMES SPHERES
 		const float d = SphereIntersect(&spheres[i], r);
 		if ((d != 0.f) && (d < maxt))
 			return 1;
@@ -109,142 +125,194 @@ OCL_CONSTANT_BUFFER
 	return 0;
 }
 
+///
+/// iterates over the lights in the scene to get how much each one contribute directly to
+/// the point (hitPoint) from a surface with a (normal) and output to (result)
+///
 static void SampleLights(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *spheres,
+	// the scene
+	OCL_CONSTANT_BUFFER const Sphere *spheres,
+	// the size of the scene
 	const unsigned int sphereCount,
+	// random seeds
 	unsigned int *seed0, unsigned int *seed1,
+	// the point we're calculating the direct contribution of 01 light
 	const vec *hitPoint,
+	// the normal on that point
 	const vec *normal,
+	// the returning direct lighting contribution
 	vec *result) {
+
+	// result = (0,0,0)
 	vclr(*result);
 
-	/* For each light */
+	// for each light...
 	unsigned int i;
 	for (i = 0; i < sphereCount; i++) {
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-		const Sphere *light = &spheres[i];
+		OCL_CONSTANT_BUFFER const Sphere *light = &spheres[i];
 		if (!viszero(light->e)) {
-			/* It is a light source */
+			// this is a light source (it has an emission component)...
+			// the shadow ray starts at the hitPoint and goes to a random point on the light
 			Ray shadowRay;
 			shadowRay.o = *hitPoint;
 
-			/* Choose a point over the light source */
+			// choose a random point over the area of the light source
+			// ASSUMES SPHERE (...i think... maybe this could be applicable to "bounding spheres"...)
+			// first we find a random point in a unit sphere, then we multiply it by the light sphere radius
+			// and then we find the point in world coordinates (by adding the light sphere center coords)
 			vec unitSpherePoint;
 			UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
 			vec spherePoint;
 			vsmul(spherePoint, light->rad, unitSpherePoint);
 			vadd(spherePoint, spherePoint, light->p);
 
-			/* Build the shadow ray direction */
+			// configures the direction of the shadow ray, finds its length (keep it on len)
+			// and then normalizes the direction vector
 			vsub(shadowRay.d, spherePoint, *hitPoint);
 			const float len = sqrt(vdot(shadowRay.d, shadowRay.d));
 			vsmul(shadowRay.d, 1.f / len, shadowRay.d);
 
+			// finds the angle between shadow and the light sphere normal
+			// if it is accute (ie, dot > 0, we hit the backside of the light
+            //    ...unitSpherePoint is a vector that points from the sphere center to its surface point
 			float wo = vdot(shadowRay.d, unitSpherePoint);
 			if (wo > 0.f) {
-				/* It is on the other half of the sphere */
+				// we hit the other half of the sphere... should ignore it
 				continue;
-			} else
+			} else {
+			    // we just flip the sign of the cosine because we want it positive
+			    //   ...basically because we want the vector to be from the light sphere surface to its center
 				wo = -wo;
+			}
 
-			/* Check if the light is visible */
+			// now we send the shadow ray to the light and see if it hits another object before it...
+			//   wi > 0 <=> the light is in the outside and in the direction of the hitPoint normal
 			const float wi = vdot(shadowRay.d, *normal);
 			if ((wi > 0.f) && (!IntersectP(spheres, sphereCount, &shadowRay, len - EPSILON))) {
-				vec c; vassign(c, light->e);
+                // the object faces the light (wi > 0) and the shadow ray doesnt intersect anything
+                //
+                //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
+                //     ...where did this formula come from?
+				vec lightColor; vassign(lightColor, light->e);
 				const float s = (4.f * FLOAT_PI * light->rad * light->rad) * wi * wo / (len *len);
-				vsmul(c, s, c);
-				vadd(*result, *result, c);
+				vsmul(lightColor, s, lightColor);
+
+				// last, we add the direct contribution of this light to the output Ld radiance
+				vadd(*result, *result, lightColor);
 			}
 		}
 	}
 }
 
 static void RadiancePathTracing(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *spheres,
+    // the scene
+    OCL_CONSTANT_BUFFER const Sphere *spheres,
+	// size of the scene
 	const unsigned int sphereCount,
+	// primary ray
 	const Ray *startRay,
+	// seeds for random numbers
 	unsigned int *seed0, unsigned int *seed1,
+	// the radiance found for the ray
 	vec *result) {
+
 	Ray currentRay; rassign(currentRay, *startRay);
-	vec rad; vinit(rad, 0.f, 0.f, 0.f);
+	vec radiance; vinit(radiance, 0.f, 0.f, 0.f);
 	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
 	for (;; ++depth) {
 		// Removed Russian Roulette in order to improve execution on SIMT
+		// we bounce the ray for 6 times (primary + 6 = 7)
 		if (depth > 6) {
-			*result = rad;
+			*result = radiance;
 			return;
 		}
 
-		float t; /* distance to intersection */
-		unsigned int id = 0; /* id of intersected object */
+		// distance to intersection
+		float t;
+		// id of intersected object (ie, its index in array)
+		unsigned int id = 0;
+
 		if (!Intersect(spheres, sphereCount, &currentRay, &t, &id)) {
-			*result = rad; /* if miss, return */
+			*result = radiance;
+			// if the ray missed, return just the color so far...
+			// we could put a skybox here...
 			return;
 		}
 
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-		const Sphere *obj = &spheres[id]; /* the hit object */
+		// the hit object
+		OCL_CONSTANT_BUFFER const Sphere *obj = &spheres[id];
 
+		// the intersection point
 		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);
 		vadd(hitPoint, currentRay.o, hitPoint);
 
+		// the normal at the intersection point
+		// ASSUMING SPHERE
 		vec normal;
 		vsub(normal, hitPoint, obj->p);
 		vnorm(normal);
 
+		// cosine of the angle between the normal and the ray direction
+		// this angle is accute if hitting from inside the sphere, and obtuse otherwise
 		const float dp = vdot(normal, currentRay.d);
 
+		// nl is the normal of the hitPoint and here we check
+		// if we need to flip it (in case we're hitting from inside the sphere)
+		// ASSUMING SPHERE
 		vec nl;
-		// SIMT optimization
 		const float invSignDP = -1.f * sign(dp);
 		vsmul(nl, invSignDP, normal);
 
-		/* Add emitted light */
+		// adds the light emitted by the object hit
 		vec eCol; vassign(eCol, obj->e);
+		// if the object does emit light....
 		if (!viszero(eCol)) {
+			// and if this is a bounce originated from specular materials...
 			if (specularBounce) {
+				// reduce the emitted color according to the ray hitting angle and normal, then by this throughput,
+				// then adds it to the output radiance
 				vsmul(eCol, fabs(dp), eCol);
 				vmul(eCol, throughput, eCol);
-				vadd(rad, rad, eCol);
+				vadd(radiance, radiance, eCol);
 			}
 
-			*result = rad;
+			// light emitting objects do not bounce the ray, so we return
+			*result = radiance;
 			return;
 		}
 
-		if (obj->refl == DIFF) { /* Ideal DIFFUSE reflection */
+		// 100% DIFFUSE material
+		if (obj->refl == DIFF) {
+			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
 			specularBounce = 0;
 			vmul(throughput, throughput, obj->c);
 
-			/* Direct lighting component */
+			// direct lighting component (splitting)
+			// -------------------------------------
 
 			vec Ld;
 			SampleLights(spheres, sphereCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
-			vadd(rad, rad, Ld);
+			vadd(radiance, radiance, Ld);
 
-			/* Diffuse component */
+			// diffuse component (would be recursive, made iterative for perf.)
+			// ----------------------------------------------------------------
 
+			// we'll sample a position in a unit circle that will be used to find how this currentRay
+			// will be reflected (as this is a diffuse material, it can go uniformly in any direction
+            // on the hemisphere)
 			float r1 = 2.f * FLOAT_PI * GetRandom(seed0, seed1);
 			float r2 = GetRandom(seed0, seed1);
 			float r2s = sqrt(r2);
 
+			// w = the normal of the hitpoint
 			vec w; vassign(w, nl);
 
+			// u, v, w = orthonormal basis on the hitpoint of the object ('a' is just temporary)
 			vec u, a;
 			if (fabs(w.x) > .1f) {
 				vinit(a, 0.f, 1.f, 0.f);
@@ -257,6 +325,7 @@ OCL_CONSTANT_BUFFER
 			vec v;
 			vxcross(v, w, u);
 
+			// finds the direction of the next ray on our path to trace
 			vec newDir;
 			vsmul(u, cos(r1) * r2s, u);
 			vsmul(v, sin(r1) * r2s, v);
@@ -266,19 +335,28 @@ OCL_CONSTANT_BUFFER
 
 			currentRay.o = hitPoint;
 			currentRay.d = newDir;
+
+			// finished this ray, let's go shoot the the next one
 			continue;
-		} else if (obj->refl == SPEC) { /* Ideal SPECULAR reflection */
+
+		} else if (obj->refl == SPEC) {
+			// 100% SPECULAR material
 			specularBounce = 1;
 
+			// finds the perfectly reflected ray
 			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
+			// multiplies the throughput by the object color (whatever that is...)
 			vmul(throughput, throughput, obj->c);
 
+			// sets up the next ray in the series and shoots it in the scene
 			rinit(currentRay, hitPoint, newDir);
 			continue;
+
 		} else {
+			// 100% REFRACTION material
 			specularBounce = 1;
 
 			vec newDir;
@@ -338,10 +416,7 @@ OCL_CONSTANT_BUFFER
 }
 
 static void RadianceDirectLighting(
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-	const Sphere *spheres,
+	OCL_CONSTANT_BUFFER const Sphere *spheres,
 	const unsigned int sphereCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
@@ -366,10 +441,7 @@ OCL_CONSTANT_BUFFER
 			return;
 		}
 
-#ifdef GPU_KERNEL
-OCL_CONSTANT_BUFFER
-#endif
-		const Sphere *obj = &spheres[id]; /* the hit object */
+		OCL_CONSTANT_BUFFER const Sphere *obj = &spheres[id]; /* the hit object */
 
 		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);

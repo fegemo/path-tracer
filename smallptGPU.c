@@ -222,14 +222,6 @@ static char *readFileByLine(const char *fileName) {
 /// Sets up platorm, devices, context, command queue, buffers and kernel.
 ///
 static void setUpOpenCL() {
-	cl_device_type dType;
-
-	if (useGPU)
-		dType = CL_DEVICE_TYPE_GPU;
-	else
-		dType = CL_DEVICE_TYPE_CPU;
-
-
 	// selecting the platform
     // ----------------------
 
@@ -831,7 +823,8 @@ void updateRendering() {
 		executeKernel();
 		currentSample++;
 	} else {
-		// if we are past the initial 20 samples, execute kernels more frequently
+		// if we are past the initial 20 samples, update the window less frequently
+		// (every 500ms instead of for every sample)
 		const float k = min(currentSample - 20, 100) / 100.f;
 		const float tresholdTime = 0.5f * k;
 		for (;;) {
