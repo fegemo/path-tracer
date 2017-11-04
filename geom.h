@@ -40,11 +40,26 @@ enum Refl {
 	DIFF, SPEC, REFR
 }; /* material types, used in radiance() */
 
+
+enum ObjectType {
+    SPHERE, TRIANGLE
+};
+
 typedef struct {
-	float rad; /* radius */
-	vec p, e, c; /* position, emission, color */
-	enum Refl refl; /* reflection type (DIFFuse, SPECular, REFRactive) */
-} Sphere;
+    // for any type: type and material
+    enum ObjectType type;
+    vec emission, color;
+    enum Refl refl;
+
+    // for spheres:
+    float radius;
+    vec center;
+
+    // for triangles:
+    vec p1, p2, p3;
+
+    // for ??:
+} Object;
 
 #endif	/* _GEOM_H */
 

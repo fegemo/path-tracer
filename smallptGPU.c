@@ -41,7 +41,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 #include "camera.h"
-#include "scene.h"
+#include "vec.h"
+#include "geom.h"
+#include "simplernd.h"
 #include "displayfunc.h"
 
 /* Options */
@@ -53,7 +55,7 @@ static cl_context context;
 static cl_mem colorBuffer;
 static cl_mem pixelBuffer;
 static cl_mem seedBuffer;
-static cl_mem sphereBuffer;
+static cl_mem objectBuffer;
 static cl_mem cameraBuffer;
 static cl_command_queue commandQueue;
 static cl_program program;
@@ -65,8 +67,8 @@ static vec *colors;
 static unsigned int *seeds;
 Camera camera;
 static int currentSample = 0;
-Sphere *spheres;
-unsigned int sphereCount;
+Object *objects;
+unsigned int objectCount;
 
 ///
 /// Frees the color, pixel and random seeds buffer from vram and ram.
@@ -505,17 +507,17 @@ static void setUpOpenCL() {
     // creating buffers for our objects
     // --------------------------------
 
-    // allocates space on the device memory to hold the spheres that compose the scene
+    // allocates space on the device memory to hold the objects that compose the scene
     // context (id), flags (rw, r, w etc), size (bytes of the buffer to be allocated),
     //      host_ptr (pointer to regular memory - a bit confusing...), errcode_ret
-	sphereBuffer = clCreateBuffer(
+	objectBuffer = clCreateBuffer(
             context,
 #ifdef __APPLE__
             CL_MEM_READ_WRITE, // NOTE: not READ_ONLY because of Apple's OpenCL bug
 #else
 			CL_MEM_READ_ONLY,
 #endif
-            sizeof(Sphere) * sphereCount,
+            sizeof(Object) * objectCount,
             NULL,
             &status);
 	if (status != CL_SUCCESS) {
@@ -532,11 +534,11 @@ static void setUpOpenCL() {
     //      event (that represents this command - returned)
 	status = clEnqueueWriteBuffer(
 			commandQueue,
-			sphereBuffer,
+			objectBuffer,
 			CL_TRUE,
 			0,
-			sizeof(Sphere) * sphereCount,
-			spheres,
+			sizeof(Object) * objectCount,
+			objects,
 			0,
 			NULL,
 			NULL);
@@ -740,12 +742,12 @@ void updateRendering() {
 		exit(-1);
 	}
 
-	// now, for the sphere buffer
+	// now, for the objects buffer
 	status = clSetKernelArg(
 			kernel,
 			2,
 			sizeof(cl_mem),
-			(void *)&sphereBuffer);
+			(void *)&objectBuffer);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to set OpenCL arg. #3: %d\n", status);
 		exit(-1);
@@ -762,12 +764,12 @@ void updateRendering() {
 		exit(-1);
 	}
 
-	// and the sphere count
+	// and the objects count
 	status = clSetKernelArg(
 			kernel,
 			4,
 			sizeof(unsigned int),
-			(void *)&sphereCount);
+			(void *)&objectCount);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to set OpenCL arg. #5: %d\n", status);
 		exit(-1);
@@ -880,11 +882,11 @@ void reInitSceneObjects() {
 	// writes the scene objects buffer to vram again
     cl_int status = clEnqueueWriteBuffer(
 			commandQueue,
-			sphereBuffer,
+			objectBuffer,
 			CL_TRUE,
 			0,
-			sizeof(Sphere) * sphereCount,
-			spheres,
+			sizeof(Object) * objectCount,
+			objects,
 			0,
 			NULL,
 			NULL);
@@ -944,11 +946,12 @@ int main(int argc, char *argv[]) {
 		height = atoi(argv[5]);
 		readScene(argv[6]);
 	} else if (argc == 1) {
-		spheres = CornellSpheres;
-		sphereCount = sizeof(CornellSpheres) / sizeof(Sphere);
-
-		vinit(camera.orig, 50.f, 45.f, 205.6f);
-		vinit(camera.target, 50.f, 45 - 0.042612f, 204.6);
+		useGPU = 1;
+		forceWorkSize = 0;
+		kernelFileName = "rendering_kernel.cl";
+		width = 480;
+		height = 320;
+		readScene("scenes/cornell.scn");
 	} else {
 		exit(-1);
     }

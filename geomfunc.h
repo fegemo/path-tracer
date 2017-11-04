@@ -30,13 +30,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef SMALLPT_GPU
 
 static float SphereIntersect(
-    OCL_CONSTANT_BUFFER const Sphere *s,
+    OCL_CONSTANT_BUFFER const Object *s,
 	const Ray *r) { /* returns distance, 0 if nohit */
 	vec op; /* Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0 */
-	vsub(op, s->p, r->o);
+	vsub(op, s->center, r->o);
 
 	float b = vdot(op, r->d);
-	float det = b * b - vdot(op, op) + s->rad * s->rad;
+	float det = b * b - vdot(op, op) + s->radius * s->radius;
 	if (det < 0.f)
 		return 0.f;
 	else
@@ -53,6 +53,56 @@ static float SphereIntersect(
 		else
 			return 0.f;
 	}
+}
+
+///
+/// Determines if a ray intersected with a triangle (algorithm from pbrt: 141-2)
+/// Returns the t != 0 if there was a hit.
+///
+static float TriangleIntersect(OCL_CONSTANT_BUFFER const Object *triangle, const Ray *ray) {
+
+    // calculates s1 = ray.direction x e2
+    vec e1; vsub(e1, triangle->p2, triangle->p1);
+    vec e2; vsub(e2, triangle->p3, triangle->p1);
+    vec s1; vxcross(s1, ray->d, e2);
+    float divisor = vdot(s1, e1);
+    if (divisor == 0) {
+        return 0;
+    }
+    float invDivisor = 1.f / divisor;
+
+    // finds the first barycentric coordinate (b1)
+    vec d; vsub(d, ray->o, triangle->p1);
+    float b1 = vdot(d, s1) * invDivisor;
+    if (b1 < 0. || b1 > 1.) {
+        return 0;
+    }
+
+    // finds the second one (b2)
+    vec s2; vxcross(s2, d, e1);
+    float b2 = vdot(ray->d, s2) * invDivisor;
+    if (b2 < 0. || b1 + b2 > 1.) {
+        return 0;
+    }
+
+    // computes t to intersection point
+    float t = vdot(e2, s2) * invDivisor;
+    if (t > EPSILON) {
+        return t;
+    }
+
+    return 0;
+}
+
+static void SphereNormal(vec *normal, OCL_CONSTANT_BUFFER const Object *sphere, const vec hitPoint) {
+    vsub(*normal, hitPoint, sphere->center);
+    vnorm(*normal);
+}
+
+static void TriangleNormal(vec *normal, OCL_CONSTANT_BUFFER const Object *triangle, vec hitPoint) {
+    vec e1; vsub(e1, triangle->p2, triangle->p1);
+    vec e2; vsub(e2, triangle->p3, triangle->p1);
+    vxcross(*normal, e1, e2);
 }
 
 ///
@@ -79,23 +129,35 @@ static void UniformSampleSphere(const float u1, const float u2, vec *v) {
 /// checks if a ray intersects an object in the scene and return the intersection information
 ///
 static int Intersect(
-    OCL_CONSTANT_BUFFER const Sphere *spheres,
-	const unsigned int sphereCount,
+    OCL_CONSTANT_BUFFER const Object *objects,
+	const unsigned int objectCount,
 	const Ray *r,
 	float *t,
 	unsigned int *id) {
 
 	float inf = (*t) = 1e20f;
 
-	unsigned int i = sphereCount;
+	unsigned int i = objectCount;
 	for (; i--;) {
-        // ASSUMES SPHERES
-		const float d = SphereIntersect(&spheres[i], r);
+//        printf("checking obj #%d with type %d\n", i, objects[i].type);
+        float d;
+        switch (objects[i].type) {
+        case SPHERE:
+//            printf("hit a sphere\n");
+            d = SphereIntersect(&objects[i], r);
+            break;
+        case TRIANGLE:
+//            printf("hit a tri\n");
+            d = TriangleIntersect(&objects[i], r);
+            break;
+        }
+
 		if ((d != 0.f) && (d < *t)) {
 			*t = d;
 			*id = i;
 		}
 	}
+
 
 	return (*t < inf);
 }
@@ -105,21 +167,31 @@ static int Intersect(
 ///
 static int IntersectP(
     // scene description
-    OCL_CONSTANT_BUFFER const Sphere *spheres,
-	const unsigned int sphereCount,
+    OCL_CONSTANT_BUFFER const Object *objects,
+	const unsigned int objectCount,
 	// the ray being cast
 	const Ray *r,
 	// the maximum distance
 	const float maxt) {
 
-	unsigned int i = sphereCount;
+	unsigned int i = objectCount;
 
 	// iterates on the scene checking for intersection with the ray
 	for (; i--;) {
-        // ASSUMES SPHERES
-		const float d = SphereIntersect(&spheres[i], r);
-		if ((d != 0.f) && (d < maxt))
+		float d;
+
+		switch (objects[i].type) {
+        case SPHERE:
+            d = SphereIntersect(&objects[i], r);
+        case TRIANGLE:
+//            printf("hit a triangle from intersectinP\n");
+            d = TriangleIntersect(&objects[i], r);
+            break;
+		}
+
+		if ((d != 0.f) && (d < maxt)) {
 			return 1;
+		}
 	}
 
 	return 0;
@@ -131,12 +203,12 @@ static int IntersectP(
 ///
 static void SampleLights(
 	// the scene
-	OCL_CONSTANT_BUFFER const Sphere *spheres,
+	OCL_CONSTANT_BUFFER const Object *objects,
 	// the size of the scene
-	const unsigned int sphereCount,
+	const unsigned int objectCount,
 	// random seeds
 	unsigned int *seed0, unsigned int *seed1,
-	// the point we're calculating the direct contribution of 01 light
+	// the point we're calculating the direct contribution from light
 	const vec *hitPoint,
 	// the normal on that point
 	const vec *normal,
@@ -148,9 +220,9 @@ static void SampleLights(
 
 	// for each light...
 	unsigned int i;
-	for (i = 0; i < sphereCount; i++) {
-		OCL_CONSTANT_BUFFER const Sphere *light = &spheres[i];
-		if (!viszero(light->e)) {
+	for (i = 0; i < objectCount; i++) {
+		OCL_CONSTANT_BUFFER const Object *light = &objects[i];
+		if (!viszero(light->emission)) {
 			// this is a light source (it has an emission component)...
 			// the shadow ray starts at the hitPoint and goes to a random point on the light
 			Ray shadowRay;
@@ -163,8 +235,8 @@ static void SampleLights(
 			vec unitSpherePoint;
 			UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
 			vec spherePoint;
-			vsmul(spherePoint, light->rad, unitSpherePoint);
-			vadd(spherePoint, spherePoint, light->p);
+			vsmul(spherePoint, light->radius, unitSpherePoint);
+			vadd(spherePoint, spherePoint, light->center);
 
 			// configures the direction of the shadow ray, finds its length (keep it on len)
 			// and then normalizes the direction vector
@@ -188,13 +260,13 @@ static void SampleLights(
 			// now we send the shadow ray to the light and see if it hits another object before it...
 			//   wi > 0 <=> the light is in the outside and in the direction of the hitPoint normal
 			const float wi = vdot(shadowRay.d, *normal);
-			if ((wi > 0.f) && (!IntersectP(spheres, sphereCount, &shadowRay, len - EPSILON))) {
+			if ((wi > 0.f) && (!IntersectP(objects, objectCount, &shadowRay, len - EPSILON))) {
                 // the object faces the light (wi > 0) and the shadow ray doesnt intersect anything
                 //
                 //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
                 //     ...where did this formula come from?
-				vec lightColor; vassign(lightColor, light->e);
-				const float s = (4.f * FLOAT_PI * light->rad * light->rad) * wi * wo / (len *len);
+				vec lightColor; vassign(lightColor, light->emission);
+				const float s = (4.f * FLOAT_PI * light->radius * light->radius) * wi * wo / (len *len);
 				vsmul(lightColor, s, lightColor);
 
 				// last, we add the direct contribution of this light to the output Ld radiance
@@ -206,9 +278,9 @@ static void SampleLights(
 
 static void RadiancePathTracing(
     // the scene
-    OCL_CONSTANT_BUFFER const Sphere *spheres,
+    OCL_CONSTANT_BUFFER const Object *objects,
 	// size of the scene
-	const unsigned int sphereCount,
+	const unsigned int objectCount,
 	// primary ray
 	const Ray *startRay,
 	// seeds for random numbers
@@ -235,7 +307,7 @@ static void RadiancePathTracing(
 		// id of intersected object (ie, its index in array)
 		unsigned int id = 0;
 
-		if (!Intersect(spheres, sphereCount, &currentRay, &t, &id)) {
+		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			*result = radiance;
 			// if the ray missed, return just the color so far...
 			// we could put a skybox here...
@@ -243,7 +315,7 @@ static void RadiancePathTracing(
 		}
 
 		// the hit object
-		OCL_CONSTANT_BUFFER const Sphere *obj = &spheres[id];
+		OCL_CONSTANT_BUFFER const Object *obj = &objects[id];
 
 		// the intersection point
 		vec hitPoint;
@@ -251,10 +323,18 @@ static void RadiancePathTracing(
 		vadd(hitPoint, currentRay.o, hitPoint);
 
 		// the normal at the intersection point
-		// ASSUMING SPHERE
+
 		vec normal;
-		vsub(normal, hitPoint, obj->p);
-		vnorm(normal);
+		switch (obj->type) {
+        case SPHERE:
+            SphereNormal(&normal, obj, hitPoint);
+            break;
+
+        case TRIANGLE:
+            TriangleNormal(&normal, obj, hitPoint);
+            break;
+
+		}
 
 		// cosine of the angle between the normal and the ray direction
 		// this angle is accute if hitting from inside the sphere, and obtuse otherwise
@@ -262,13 +342,12 @@ static void RadiancePathTracing(
 
 		// nl is the normal of the hitPoint and here we check
 		// if we need to flip it (in case we're hitting from inside the sphere)
-		// ASSUMING SPHERE
 		vec nl;
 		const float invSignDP = -1.f * sign(dp);
 		vsmul(nl, invSignDP, normal);
 
 		// adds the light emitted by the object hit
-		vec eCol; vassign(eCol, obj->e);
+		vec eCol; vassign(eCol, obj->emission);
 		// if the object does emit light....
 		if (!viszero(eCol)) {
 			// and if this is a bounce originated from specular materials...
@@ -289,13 +368,13 @@ static void RadiancePathTracing(
 		if (obj->refl == DIFF) {
 			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
 			specularBounce = 0;
-			vmul(throughput, throughput, obj->c);
+			vmul(throughput, throughput, obj->color);
 
 			// direct lighting component (splitting)
 			// -------------------------------------
 
 			vec Ld;
-			SampleLights(spheres, sphereCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			SampleLights(objects, objectCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(radiance, radiance, Ld);
 
@@ -349,7 +428,7 @@ static void RadiancePathTracing(
 			vsub(newDir, currentRay.d, newDir);
 
 			// multiplies the throughput by the object color (whatever that is...)
-			vmul(throughput, throughput, obj->c);
+			vmul(throughput, throughput, obj->color);
 
 			// sets up the next ray in the series and shoots it in the scene
 			rinit(currentRay, hitPoint, newDir);
@@ -373,7 +452,7 @@ static void RadiancePathTracing(
 			float cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn);
 
 			if (cos2t < 0.f)  { /* Total internal reflection */
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
@@ -400,13 +479,13 @@ static void RadiancePathTracing(
 
 			if (GetRandom(seed0, seed1) < P) { /* R.R. */
 				vsmul(throughput, RP, throughput);
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
 			} else {
 				vsmul(throughput, TP, throughput);
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rinit(currentRay, hitPoint, transDir);
 				continue;
@@ -416,8 +495,8 @@ static void RadiancePathTracing(
 }
 
 static void RadianceDirectLighting(
-	OCL_CONSTANT_BUFFER const Sphere *spheres,
-	const unsigned int sphereCount,
+	OCL_CONSTANT_BUFFER const Object *objects,
+	const unsigned int objectCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
 	vec *result) {
@@ -436,19 +515,19 @@ static void RadianceDirectLighting(
 
 		float t; /* distance to intersection */
 		unsigned int id = 0; /* id of intersected object */
-		if (!Intersect(spheres, sphereCount, &currentRay, &t, &id)) {
+		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			*result = rad; /* if miss, return */
 			return;
 		}
 
-		OCL_CONSTANT_BUFFER const Sphere *obj = &spheres[id]; /* the hit object */
+		OCL_CONSTANT_BUFFER const Object *obj = &objects[id]; /* the hit object */
 
 		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);
 		vadd(hitPoint, currentRay.o, hitPoint);
 
 		vec normal;
-		vsub(normal, hitPoint, obj->p);
+		vsub(normal, hitPoint, obj->center);
 		vnorm(normal);
 
 		const float dp = vdot(normal, currentRay.d);
@@ -459,7 +538,7 @@ static void RadianceDirectLighting(
 		vsmul(nl, invSignDP, normal);
 
 		/* Add emitted light */
-		vec eCol; vassign(eCol, obj->e);
+		vec eCol; vassign(eCol, obj->emission);
 		if (!viszero(eCol)) {
 			if (specularBounce) {
 				vsmul(eCol, fabs(dp), eCol);
@@ -473,12 +552,12 @@ static void RadianceDirectLighting(
 
 		if (obj->refl == DIFF) { /* Ideal DIFFUSE reflection */
 			specularBounce = 0;
-			vmul(throughput, throughput, obj->c);
+			vmul(throughput, throughput, obj->color);
 
 			/* Direct lighting component */
 
 			vec Ld;
-			SampleLights(spheres, sphereCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			SampleLights(objects, objectCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
 
@@ -491,7 +570,7 @@ static void RadianceDirectLighting(
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
-			vmul(throughput, throughput, obj->c);
+			vmul(throughput, throughput, obj->color);
 
 			rinit(currentRay, hitPoint, newDir);
 			continue;
@@ -512,7 +591,7 @@ static void RadianceDirectLighting(
 			float cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn);
 
 			if (cos2t < 0.f)  { /* Total internal reflection */
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
@@ -539,13 +618,13 @@ static void RadianceDirectLighting(
 
 			if (GetRandom(seed0, seed1) < P) { /* R.R. */
 				vsmul(throughput, RP, throughput);
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
 			} else {
 				vsmul(throughput, TP, throughput);
-				vmul(throughput, throughput, obj->c);
+				vmul(throughput, throughput, obj->color);
 
 				rinit(currentRay, hitPoint, transDir);
 				continue;

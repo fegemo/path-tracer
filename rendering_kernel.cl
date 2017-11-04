@@ -68,8 +68,8 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 
 __kernel void radianceGPU(
     __global vec *colors, __global unsigned int *seedsInput,
-	OCL_CONSTANT_BUFFER Sphere *sphere, OCL_CONSTANT_BUFFER Camera *camera,
-	const unsigned int sphereCount,
+	OCL_CONSTANT_BUFFER Object *object, OCL_CONSTANT_BUFFER Camera *camera,
+	const unsigned int objectCount,
 	const int width, const int height,
 	const int currentSample,
 	__global int *pixels) {
@@ -96,7 +96,7 @@ __kernel void radianceGPU(
 	// shoots the ray in the scene and receives back a radiance value
 	// the output is returned on "radiance"
 	vec radiance;
-	RadiancePathTracing(sphere, sphereCount, &ray, &seed0, &seed1, &radiance);
+	RadiancePathTracing(object, objectCount, &ray, &seed0, &seed1, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {

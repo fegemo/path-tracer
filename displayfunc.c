@@ -48,8 +48,8 @@ extern void updateRendering();
 extern void updateCamera();
 
 extern Camera camera;
-extern Sphere *spheres;
-extern unsigned int sphereCount;
+extern Object *objects;
+extern unsigned int objectCount;
 
 int amiSmallptCPU;
 
@@ -59,7 +59,7 @@ unsigned int *pixels;
 char captionBuffer[256];
 
 static int shouldRenderHelp = 1;
-static int currentSphere;
+//static int currentSphere;
 
 double wallClockTime() {
 #if defined(__linux__) || defined(__APPLE__)
@@ -120,7 +120,7 @@ static void renderHelp() {
 }
 
 ///
-/// Reads a scene file and saves the objects in the spheres global array.
+/// Reads a scene file and saves the objects in the objects global array.
 ///
 void readScene(char *fileName) {
 	fprintf(stderr, "Reading scene: %s\n", fileName);
@@ -140,46 +140,83 @@ void readScene(char *fileName) {
 		exit(-1);
 	}
 
-	// line 2: sphere count: size n
-	c = fscanf(f,"size %u\n", &sphereCount);
-	if (c != 1) {
-		fprintf(stderr, "Failed to read sphere count: %d\n", c);
+	// line 2: object counts: size n
+	c = fscanf(f,"size %u\n", &objectCount);
+	if (c < 1) {
+		fprintf(stderr, "Failed to read object count: %d\n", c);
 		exit(-1);
 	}
-	fprintf(stderr, "Scene size: %d\n", sphereCount);
+	fprintf(stderr, "Scene size: %d\n", objectCount);
 
-	// line 3+: sphere descriptors
-	spheres = (Sphere *)malloc(sizeof(Sphere) * sphereCount);
+	// line 3+: object descriptors
+	objects = (Object *)malloc(sizeof(Object) * objectCount);
 	unsigned int i;
-	for (i = 0; i < sphereCount; i++) {
-		Sphere *s = &spheres[i];
+	for (i = 0; i < objectCount; i++) {
+//        printf("reading an object\n");
+        Object *obj = &objects[i];
 		int mat;
-		// line x: sphere     radius  x  y  z  emission  color   reflection
-		int c = fscanf(f,"sphere %f  %f %f %f  %f %f %f  %f %f %f  %d\n",
-				&s->rad,
-				&s->p.x, &s->p.y, &s->p.z,
-				&s->e.x, &s->e.y, &s->e.z,
-				&s->c.x, &s->c.y, &s->c.z,
+		int objectType;
+		char objectTypeString[100];
+
+		int readValuesCount = fscanf(f, "%s", objectTypeString);
+        if (readValuesCount != 1) {
+            fprintf(stderr, "Failed to read object description type. Expected 1, found %d value(s)\n", readValuesCount);
+            exit(-1);
+        }
+
+		if (strcmp(objectTypeString, "sphere") == 0) {
+		    obj->type = SPHERE;
+            // line x: sphere     radius  xyz  emission  color  reflection
+            readValuesCount = fscanf(f,"%f  %f %f %f  %f %f %f  %f %f %f  %d\n",
+				&obj->radius,
+				&obj->center.x, &obj->center.y, &obj->center.z,
+				&obj->emission.x, &obj->emission.y, &obj->emission.z,
+				&obj->color.x, &obj->color.y, &obj->color.z,
 				&mat);
-		switch (mat) {
-			case 0:
-				s->refl = DIFF;
-				break;
-			case 1:
-				s->refl = SPEC;
-				break;
-			case 2:
-				s->refl = REFR;
-				break;
-			default:
-				fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", i, mat);
-				exit(-1);
-				break;
+            switch (mat) {
+                case 0: obj->refl = DIFF; break;
+                case 1: obj->refl = SPEC; break;
+                case 2: obj->refl = REFR; break;
+                default:
+                    fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", i, mat);
+                    exit(-1);
+                    break;
+            }
+
+            if (readValuesCount != 11) {
+                fprintf(stderr, "Failed to read sphere #%d: %d\n", i, readValuesCount);
+                exit(-1);
+            }
+
+		} else if (strcmp(objectTypeString, "triangle") == 0) {
+		    obj->type = TRIANGLE;
+            readValuesCount = fscanf(f, "%f %f %f  %f %f %f  %f %f %f  %f %f %f  %f %f %f  %d\n",
+                &obj->p1.x, &obj->p1.y, &obj->p1.z,
+                &obj->p2.x, &obj->p2.y, &obj->p2.z,
+                &obj->p3.x, &obj->p3.y, &obj->p3.z,
+                &obj->emission.x, &obj->emission.y, &obj->emission.z,
+                &obj->color.x, &obj->color.y, &obj->color.z,
+                &mat);
+//            printf("triangle: %f %f %f   %f %f %f   %f %f %f   %f %f %f   %f %f %f    %d\n",
+//                   obj->p1.x, obj->p1.y, obj->p1.z, obj->p2.x, obj->p2.y, obj->p2.z, obj->p3.x, obj->p3.y, obj->p3.z, obj->emission.x, obj->emission.y, obj->emission.z, obj->color.x, obj->color.y, obj->color.z, obj->refl);
+            switch (mat) {
+                case 0: obj->refl = DIFF; break;
+                case 1: obj->refl = SPEC; break;
+                case 2: obj->refl = REFR; break;
+                    fprintf(stderr, "Failed to read material type for triangle #%d: %d\n", i, mat);
+                    exit(-1);
+                    break;
+            }
+
+            if (readValuesCount != 16) {
+                fprintf(stderr, "Failed to read triangle #%d: %d\n", i, readValuesCount);
+                exit(-1);
+            }
+		} else if (strcmp(objectTypeString, "model") == 0) {
+            fprintf(stderr, "Using models has not yet been implemented #%d: %d\n", i, mat);
+            exit(-1);
 		}
-		if (c != 11) {
-			fprintf(stderr, "Failed to read sphere #%d: %d\n", i, c);
-			exit(-1);
-		}
+
 	}
 
 	fclose(f);
@@ -336,42 +373,42 @@ void keyboard(unsigned char key, int x, int y) {
 			camera.target.y -= MOVE_STEP;
 			reInitViewpointDependentBuffers(0);
 			break;
-		case '+':
-			currentSphere = (currentSphere + 1) % sphereCount;
-			fprintf(stderr, "Selected sphere %d (%f %f %f)\n", currentSphere,
-					spheres[currentSphere].p.x, spheres[currentSphere].p.y, spheres[currentSphere].p.z);
-			reInitSceneObjects();
-			break;
-		case '-':
-			currentSphere = (currentSphere + (sphereCount - 1)) % sphereCount;
-			fprintf(stderr, "Selected sphere %d (%f %f %f)\n", currentSphere,
-					spheres[currentSphere].p.x, spheres[currentSphere].p.y, spheres[currentSphere].p.z);
-			reInitSceneObjects();
-			break;
-		case '4':
-			spheres[currentSphere].p.x -= 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
-		case '6':
-			spheres[currentSphere].p.x += 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
-		case '8':
-			spheres[currentSphere].p.z -= 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
-		case '2':
-			spheres[currentSphere].p.z += 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
-		case '9':
-			spheres[currentSphere].p.y += 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
-		case '3':
-			spheres[currentSphere].p.y -= 0.5f * MOVE_STEP;
-			reInitSceneObjects();
-			break;
+//		case '+':
+//			currentSphere = (currentSphere + 1) % sphereCount;
+//			fprintf(stderr, "Selected sphere %d (%f %f %f)\n", currentSphere,
+//					spheres[currentSphere].p.x, spheres[currentSphere].p.y, spheres[currentSphere].p.z);
+//			reInitSceneObjects();
+//			break;
+//		case '-':
+//			currentSphere = (currentSphere + (sphereCount - 1)) % sphereCount;
+//			fprintf(stderr, "Selected sphere %d (%f %f %f)\n", currentSphere,
+//					spheres[currentSphere].p.x, spheres[currentSphere].p.y, spheres[currentSphere].p.z);
+//			reInitSceneObjects();
+//			break;
+//		case '4':
+//			spheres[currentSphere].p.x -= 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
+//		case '6':
+//			spheres[currentSphere].p.x += 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
+//		case '8':
+//			spheres[currentSphere].p.z -= 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
+//		case '2':
+//			spheres[currentSphere].p.z += 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
+//		case '9':
+//			spheres[currentSphere].p.y += 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
+//		case '3':
+//			spheres[currentSphere].p.y -= 0.5f * MOVE_STEP;
+//			reInitSceneObjects();
+//			break;
 		case 'h':
 			shouldRenderHelp = (!shouldRenderHelp);
 			break;

@@ -34,7 +34,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <math.h>
 
 #include "camera.h"
-#include "scene.h"
+#include "simplernd.h"
+#include "geom.h"
+#include "geomfunc.h"
 #include "displayfunc.h"
 
 int workGroupSize = 1;
@@ -43,8 +45,8 @@ static vec *colors;
 static unsigned int *seeds;
 Camera camera;
 static int currentSample = 0;
-Sphere *spheres;
-unsigned int sphereCount;
+Object *objects;
+unsigned int objectCount;
 
 void freeBuffers() {
 	free(seeds);
@@ -97,7 +99,7 @@ void updateRendering(void) {
 			vnorm(rdir);
 			const Ray ray = {rorig, rdir};
 			vec r;
-			RadiancePathTracing(spheres, sphereCount, &ray,
+			RadiancePathTracing(objects, objectCount, &ray,
 					&seeds[i2], &seeds[i2 + 1], &r);
 
 			if (currentSample == 0)
@@ -151,13 +153,12 @@ int main(int argc, char *argv[]) {
 		height = atoi(argv[2]);
 		readScene(argv[3]);
 	} else if (argc == 1) {
-		spheres = CornellSpheres;
-		sphereCount = sizeof(CornellSpheres) / sizeof(Sphere);
-
-		vinit(camera.orig, 50.f, 45.f, 205.6f);
-		vinit(camera.target, 50.f, 45 - 0.042612f, 204.6);
-	} else
+		width = 480;
+		height = 320;
+		readScene("scenes/cornell.scn");
+	} else {
 		exit(-1);
+	}
 
 	updateCamera();
 

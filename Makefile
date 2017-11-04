@@ -16,10 +16,10 @@ default: all
 
 all: Makefile smallptCPU smallptGPU preprocessed_kernels
 
-smallptCPU: smallptCPU.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h scene.h geomfunc.h
+smallptCPU: smallptCPU.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
 	$(CC) -DSMALLPT_CPU -o smallptCPU smallptCPU.c displayfunc.c $(CCFLAGS) 
 
-smallptGPU: smallptGPU.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h scene.h geomfunc.h
+smallptGPU: smallptGPU.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
 	$(CC) -DSMALLPT_GPU -o smallptGPU smallptGPU.c displayfunc.c $(CCFLAGS)
 
 clean:
