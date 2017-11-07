@@ -36,22 +36,27 @@ static float SphereIntersect(
 	vsub(op, s->center, r->o);
 
 	float b = vdot(op, r->d);
-	float det = b * b - vdot(op, op) + s->radius * s->radius;
-	if (det < 0.f)
+	float delta = b * b - vdot(op, op) + s->radius * s->radius;
+	if (delta < 0.f) {
 		return 0.f;
-	else
-		det = sqrt(det);
-
-	float t = b - det;
-	if (t >  EPSILON)
-		return t;
+	}
 	else {
-		t = b + det;
+		delta = sqrt(delta);
+	}
 
-		if (t >  EPSILON)
+	float t = b - delta;
+	if (t >  EPSILON) {
+		return t;
+	}
+	else {
+		t = b + delta;
+
+		if (t >  EPSILON) {
 			return t;
-		else
+		}
+		else {
 			return 0.f;
+		}
 	}
 }
 
@@ -111,6 +116,7 @@ static void TriangleNormal(vec *normal, OCL_CONSTANT_BUFFER const Object *triang
 ///  v is the output point
 ///
 /// this is from pbrt page 664
+///
 static void UniformSampleSphere(const float u1, const float u2, vec *v) {
     // zz = [-1, 1]
 	const float zz = 1.f - 2.f * u1;
@@ -126,34 +132,33 @@ static void UniformSampleSphere(const float u1, const float u2, vec *v) {
 }
 
 ///
-/// checks if a ray intersects an object in the scene and return the intersection information
+/// checks if a ray intersects an object in the scene and returns the intersection information
 ///
 static int Intersect(
     OCL_CONSTANT_BUFFER const Object *objects,
 	const unsigned int objectCount,
-	const Ray *r,
+	const Ray *ray,
 	float *t,
 	unsigned int *id) {
 
 	float inf = (*t) = 1e20f;
 
-	unsigned int i = objectCount;
-	for (; i--;) {
-//        printf("checking obj #%d with type %d\n", i, objects[i].type);
-        float d;
+	for (unsigned int i = 0; i < objectCount; i++) {
+        float distance;
         switch (objects[i].type) {
         case SPHERE:
-//            printf("hit a sphere\n");
-            d = SphereIntersect(&objects[i], r);
+            distance = SphereIntersect(&objects[i], ray);
             break;
         case TRIANGLE:
-//            printf("hit a tri\n");
-            d = TriangleIntersect(&objects[i], r);
+            distance = TriangleIntersect(&objects[i], ray);
             break;
+        case MODEL:
+        default:
+            continue;
         }
 
-		if ((d != 0.f) && (d < *t)) {
-			*t = d;
+		if ((distance != 0.f) && (distance < *t)) {
+			*t = distance;
 			*id = i;
 		}
 	}
@@ -170,26 +175,27 @@ static int IntersectP(
     OCL_CONSTANT_BUFFER const Object *objects,
 	const unsigned int objectCount,
 	// the ray being cast
-	const Ray *r,
+	const Ray *ray,
 	// the maximum distance
 	const float maxt) {
 
-	unsigned int i = objectCount;
-
 	// iterates on the scene checking for intersection with the ray
-	for (; i--;) {
-		float d;
+	for (unsigned int i = 0; i < objectCount; i++) {
+		float distance;
 
 		switch (objects[i].type) {
         case SPHERE:
-            d = SphereIntersect(&objects[i], r);
-        case TRIANGLE:
-//            printf("hit a triangle from intersectinP\n");
-            d = TriangleIntersect(&objects[i], r);
+            distance = SphereIntersect(&objects[i], ray);
             break;
+        case TRIANGLE:
+            distance = TriangleIntersect(&objects[i], ray);
+            break;
+        case MODEL:
+        default:
+            continue;
 		}
 
-		if ((d != 0.f) && (d < maxt)) {
+		if ((distance != 0.f) && (distance < maxt)) {
 			return 1;
 		}
 	}
@@ -276,6 +282,7 @@ static void SampleLights(
 	}
 }
 
+
 static void RadiancePathTracing(
     // the scene
     OCL_CONSTANT_BUFFER const Object *objects,
@@ -289,7 +296,7 @@ static void RadiancePathTracing(
 	vec *result) {
 
 	Ray currentRay; rassign(currentRay, *startRay);
-	vec radiance; vinit(radiance, 0.f, 0.f, 0.f);
+	vec rad; vinit(rad, 0.f, 0.f, 0.f);
 	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
@@ -298,7 +305,7 @@ static void RadiancePathTracing(
 		// Removed Russian Roulette in order to improve execution on SIMT
 		// we bounce the ray for 6 times (primary + 6 = 7)
 		if (depth > 6) {
-			*result = radiance;
+			*result = rad;
 			return;
 		}
 
@@ -308,7 +315,7 @@ static void RadiancePathTracing(
 		unsigned int id = 0;
 
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
-			*result = radiance;
+			*result = rad;
 			// if the ray missed, return just the color so far...
 			// we could put a skybox here...
 			return;
@@ -323,7 +330,6 @@ static void RadiancePathTracing(
 		vadd(hitPoint, currentRay.o, hitPoint);
 
 		// the normal at the intersection point
-
 		vec normal;
 		switch (obj->type) {
         case SPHERE:
@@ -333,8 +339,8 @@ static void RadiancePathTracing(
         case TRIANGLE:
             TriangleNormal(&normal, obj, hitPoint);
             break;
-
 		}
+		vnorm(normal);
 
 		// cosine of the angle between the normal and the ray direction
 		// this angle is accute if hitting from inside the sphere, and obtuse otherwise
@@ -356,16 +362,16 @@ static void RadiancePathTracing(
 				// then adds it to the output radiance
 				vsmul(eCol, fabs(dp), eCol);
 				vmul(eCol, throughput, eCol);
-				vadd(radiance, radiance, eCol);
+				vadd(rad, rad, eCol);
 			}
 
 			// light emitting objects do not bounce the ray, so we return
-			*result = radiance;
+			*result = rad;
 			return;
 		}
 
 		// 100% DIFFUSE material
-		if (obj->refl == DIFF) {
+		if (obj->refl == DIFF) { /* Ideal DIFFUSE reflection */
 			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
 			specularBounce = 0;
 			vmul(throughput, throughput, obj->color);
@@ -376,7 +382,7 @@ static void RadiancePathTracing(
 			vec Ld;
 			SampleLights(objects, objectCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
-			vadd(radiance, radiance, Ld);
+			vadd(rad, rad, Ld);
 
 			// diffuse component (would be recursive, made iterative for perf.)
 			// ----------------------------------------------------------------
@@ -417,7 +423,6 @@ static void RadiancePathTracing(
 
 			// finished this ray, let's go shoot the the next one
 			continue;
-
 		} else if (obj->refl == SPEC) {
 			// 100% SPECULAR material
 			specularBounce = 1;
@@ -433,7 +438,6 @@ static void RadiancePathTracing(
 			// sets up the next ray in the series and shoots it in the scene
 			rinit(currentRay, hitPoint, newDir);
 			continue;
-
 		} else {
 			// 100% REFRACTION material
 			specularBounce = 1;
@@ -500,12 +504,14 @@ static void RadianceDirectLighting(
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
 	vec *result) {
+
 	Ray currentRay; rassign(currentRay, *startRay);
 	vec rad; vinit(rad, 0.f, 0.f, 0.f);
 	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
+
 	for (;; ++depth) {
 		// Removed Russian Roulette in order to improve execution on SIMT
 		if (depth > 6) {
@@ -526,8 +532,18 @@ static void RadianceDirectLighting(
 		vsmul(hitPoint, t, currentRay.d);
 		vadd(hitPoint, currentRay.o, hitPoint);
 
+		// the normal at the intersection point
 		vec normal;
-		vsub(normal, hitPoint, obj->center);
+		switch (obj->type) {
+        case SPHERE:
+            SphereNormal(&normal, obj, hitPoint);
+            break;
+
+        case TRIANGLE:
+            TriangleNormal(&normal, obj, hitPoint);
+            break;
+
+		}
 		vnorm(normal);
 
 		const float dp = vdot(normal, currentRay.d);

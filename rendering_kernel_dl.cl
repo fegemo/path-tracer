@@ -52,11 +52,12 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 
 __kernel void radianceGPU(
     __global vec *colors, __global unsigned int *seedsInput,
-	OCL_CONSTANT_BUFFER Sphere *sphere, OCL_CONSTANT_BUFFER Camera *camera,
-	const unsigned int sphereCount,
+	OCL_CONSTANT_BUFFER Object *object, OCL_CONSTANT_BUFFER Camera *camera,
+	const unsigned int objectCount,
 	const int width, const int height,
 	const int currentSample,
 	__global int *pixels) {
+
     const int gid = get_global_id(0);
 	const int gid2 = 2 * gid;
 	const int x = gid % width;
@@ -73,19 +74,19 @@ __kernel void radianceGPU(
 	Ray ray;
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
-	vec r;
-	RadianceDirectLighting(sphere, sphereCount, &ray, &seed0, &seed1, &r);
+	vec radiance;
+	RadianceDirectLighting(object, objectCount, &ray, &seed0, &seed1, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
 		// Jens's patch for MacOS
-		vassign(colors[i], r);
+		vassign(colors[i], radiance);
 	} else {
 		const float k1 = currentSample;
 		const float k2 = 1.f / (currentSample + 1.f);
-		colors[i].x = (colors[i].x * k1  + r.x) * k2;
-		colors[i].y = (colors[i].y * k1  + r.y) * k2;
-		colors[i].z = (colors[i].z * k1  + r.z) * k2;
+		colors[i].x = (colors[i].x * k1  + radiance.x) * k2;
+		colors[i].y = (colors[i].y * k1  + radiance.y) * k2;
+		colors[i].z = (colors[i].z * k1  + radiance.z) * k2;
 	}
 
 	pixels[y * width + x] = toInt(colors[i].x) |

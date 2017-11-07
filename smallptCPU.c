@@ -98,18 +98,20 @@ void updateRendering(void) {
 
 			vnorm(rdir);
 			const Ray ray = {rorig, rdir};
-			vec r;
+			vec radiance;
 			RadiancePathTracing(objects, objectCount, &ray,
-					&seeds[i2], &seeds[i2 + 1], &r);
+					&seeds[i2], &seeds[i2 + 1], &radiance);
+//			RadianceDirectLighting(objects, objectCount, &ray,
+//					&seeds[i2], &seeds[i2 + 1], &radiance);
 
 			if (currentSample == 0)
-				colors[i] = r;
+				colors[i] = radiance;
 			else {
 				const float k1 = currentSample;
 				const float k2 = 1.f / (k1 + 1.f);
-				colors[i].x = (colors[i].x * k1 + r.x) * k2;
-				colors[i].y = (colors[i].y * k1 + r.y) * k2;
-				colors[i].z = (colors[i].z * k1 + r.z) * k2;
+				colors[i].x = (colors[i].x * k1 + radiance.x) * k2;
+				colors[i].y = (colors[i].y * k1 + radiance.y) * k2;
+				colors[i].z = (colors[i].z * k1 + radiance.z) * k2;
 			}
 
 			pixels[y * width + x] = toInt(colors[i].x) |
@@ -155,21 +157,20 @@ int main(int argc, char *argv[]) {
 	} else if (argc == 1) {
 		width = 480;
 		height = 320;
-		readScene("scenes/cornell.scn");
+		readScene("scenes/obj-model.scn");
 	} else {
 		exit(-1);
 	}
 
 	updateCamera();
 
-	/*------------------------------------------------------------------------*/
-
+	printf("About to allocate opencl buffers...\n");
 	allocateBuffers();
 
-	/*------------------------------------------------------------------------*/
-
+	printf("About to init glut...\n");
 	initGlut(argc, argv, "SmallPT CPU V1.6 (Written by David Bucciarelli)");
 
+	printf("About to start the main loop...\n");
     glutMainLoop( );
 
 	return 0;

@@ -41,6 +41,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "camera.h"
 #include "geom.h"
 #include "displayfunc.h"
+#define TINYOBJ_LOADER_C_IMPLEMENTATION
+#include "tinyobj_loader_c.h"
 
 extern void reInitViewpointDependentBuffers(const int);
 extern void reInitSceneObjects();
@@ -72,6 +74,19 @@ double wallClockTime() {
 #else
 	Unsupported Platform !!!
 #endif
+}
+
+static const char* readFile(size_t* fileLength, const char* fileName) {
+    char *contents;
+    FILE *file = fopen(fileName, "rb");
+    fseek(file, 0, SEEK_END);
+    *fileLength = ftell(file);
+    rewind(file);
+    contents = malloc(*fileLength * (sizeof(char)));
+    fread(contents, sizeof(char), *fileLength, file);
+    fclose(file);
+
+    return contents;
 }
 
 ///
@@ -149,13 +164,13 @@ void readScene(char *fileName) {
 	fprintf(stderr, "Scene size: %d\n", objectCount);
 
 	// line 3+: object descriptors
+	printf("Allocated objects to have %d positions.\n", objectCount);
 	objects = (Object *)malloc(sizeof(Object) * objectCount);
-	unsigned int i;
-	for (i = 0; i < objectCount; i++) {
-//        printf("reading an object\n");
-        Object *obj = &objects[i];
+	unsigned int lineIndex;
+	unsigned int addedObjects = 0;
+	for (lineIndex = 0; lineIndex < objectCount; lineIndex++) {
+        Object *obj = &objects[lineIndex + addedObjects];
 		int mat;
-		int objectType;
 		char objectTypeString[100];
 
 		int readValuesCount = fscanf(f, "%s", objectTypeString);
@@ -163,6 +178,7 @@ void readScene(char *fileName) {
             fprintf(stderr, "Failed to read object description type. Expected 1, found %d value(s)\n", readValuesCount);
             exit(-1);
         }
+        printf("reading an object of type %s and saving on position %d.\n", objectTypeString, lineIndex + addedObjects);
 
 		if (strcmp(objectTypeString, "sphere") == 0) {
 		    obj->type = SPHERE;
@@ -178,13 +194,13 @@ void readScene(char *fileName) {
                 case 1: obj->refl = SPEC; break;
                 case 2: obj->refl = REFR; break;
                 default:
-                    fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", i, mat);
+                    fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", lineIndex, mat);
                     exit(-1);
                     break;
             }
 
             if (readValuesCount != 11) {
-                fprintf(stderr, "Failed to read sphere #%d: %d\n", i, readValuesCount);
+                fprintf(stderr, "Failed to read sphere #%d: %d\n", lineIndex, readValuesCount);
                 exit(-1);
             }
 
@@ -203,20 +219,131 @@ void readScene(char *fileName) {
                 case 0: obj->refl = DIFF; break;
                 case 1: obj->refl = SPEC; break;
                 case 2: obj->refl = REFR; break;
-                    fprintf(stderr, "Failed to read material type for triangle #%d: %d\n", i, mat);
+                    fprintf(stderr, "Failed to read material type for triangle #%d: %d\n", lineIndex, mat);
                     exit(-1);
                     break;
             }
 
             if (readValuesCount != 16) {
-                fprintf(stderr, "Failed to read triangle #%d: %d\n", i, readValuesCount);
+                fprintf(stderr, "Failed to read triangle #%d: %d\n", lineIndex, readValuesCount);
                 exit(-1);
             }
 		} else if (strcmp(objectTypeString, "model") == 0) {
-            fprintf(stderr, "Using models has not yet been implemented #%d: %d\n", i, mat);
-            exit(-1);
+		    char modelFilePath[200];
+		    vec modelPosition;
+            vec modelScale;
+		    obj->type = MODEL;
+		    readValuesCount = fscanf(f, "%s  %f %f %f  %f %f %f  %f %f %f  %f %f %f  %d\n", modelFilePath,
+                               &modelPosition.x, &modelPosition.y, &modelPosition.z,
+                               &modelScale.x, &modelScale.y, &modelScale.z,
+                               &obj->emission.x, &obj->emission.y, &obj->emission.z,
+                               &obj->color.x, &obj->color.y, &obj->color.z,
+                               &mat);
+
+            if (readValuesCount != 14) {
+                fprintf(stderr, "Failed to read model #%d: %d\n", lineIndex, readValuesCount);
+                exit(-1);
+            }
+
+            switch (mat) {
+                case 0: obj->refl = DIFF; break;
+                case 1: obj->refl = SPEC; break;
+                case 2: obj->refl = REFR; break;
+                    fprintf(stderr, "Failed to read material type for model #%d: %d\n", lineIndex, mat);
+                    exit(-1);
+                    break;
+            }
+
+            tinyobj_attrib_t attrib;
+            tinyobj_shape_t* shapes = NULL;
+            size_t num_shapes;
+            tinyobj_material_t* materials = NULL;
+            size_t num_materials;
+            size_t data_len = 0;
+
+            const char* data = readFile(&data_len, modelFilePath);
+            if (data == NULL) {
+                exit(-1);
+            }
+
+//            unsigned int flags = TINYOBJ_FLAG_TRIANGULATE;
+            unsigned int flags = NULL;
+            int ret = tinyobj_parse_obj(&attrib, &shapes, &num_shapes, &materials,
+                                    &num_materials, data, data_len, flags);
+            if (ret != TINYOBJ_SUCCESS) {
+                fprintf(stderr, "Error loading obj. Exiting...");
+                exit(1);
+            }
+
+            printf("# of shapes    = %d\n", (int)num_shapes);
+            printf("# of materials = %d\n", (int)num_materials);
+
+
+            unsigned int numTriangles = attrib.num_face_num_verts;
+            printf("Started reading model with %d triangles.\n", numTriangles);
+
+            objects = (Object *) realloc(objects, sizeof(Object) * (objectCount + addedObjects + numTriangles));
+            printf("Reallocated objects to have %d positions.\n", objectCount + addedObjects + numTriangles);
+            obj = &objects[lineIndex + addedObjects];
+            unsigned int faceIndex;
+            unsigned int faceOffset = 0;
+            for (faceIndex = 0; faceIndex < numTriangles; faceIndex++) { //6, 7
+                Object *tri = &objects[lineIndex + addedObjects + faceIndex + 1];
+//                printf("adding new triangle and saving on position %d.\n", lineIndex + addedObjects + faceIndex  + 1);
+                tri->type = TRIANGLE;
+                tri->emission = obj->emission;
+                tri->color = obj->color;
+                tri->refl = obj->refl;
+
+                int idxVertex1 = attrib.faces[faceOffset+0].v_idx;
+                int idxVertex2 = attrib.faces[faceOffset+1].v_idx;
+                int idxVertex3 = attrib.faces[faceOffset+2].v_idx;
+
+                vec p1; vinit(p1, attrib.vertices[3*idxVertex1+0], attrib.vertices[3*idxVertex1+1], attrib.vertices[3*idxVertex1+2]);
+                vec p2; vinit(p2, attrib.vertices[3*idxVertex2+0], attrib.vertices[3*idxVertex2+1], attrib.vertices[3*idxVertex2+2]);
+                vec p3; vinit(p3, attrib.vertices[3*idxVertex3+0], attrib.vertices[3*idxVertex3+1], attrib.vertices[3*idxVertex3+2]);
+
+                // scales the model (according to .scn file)
+                vmul(p1, modelScale, p1);
+                vmul(p2, modelScale, p2);
+                vmul(p3, modelScale, p3);
+
+                // translates the vertices to the model position (according to .scn file)
+                vadd(p1, p1, modelPosition);
+                vadd(p2, p2, modelPosition);
+                vadd(p3, p3, modelPosition);
+
+                // saves the vertices coords into the triangle structure
+                tri->p1 = p1;
+                tri->p2 = p2;
+                tri->p3 = p3;
+
+                // sets a center of the triangle (in case it's a light source) and its radius
+                vclr(tri->center)
+                vadd(tri->center, p1, tri->center);
+                vadd(tri->center, p2, tri->center);
+                vadd(tri->center, p3, tri->center);
+                vsmul(tri->center, 1/3.0f, tri->center);
+
+                // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
+                tri->radius = 7;//max(max(fabs(p1.x )))
+
+
+                faceOffset += 3;
+            }
+
+            addedObjects += numTriangles;
 		}
 
+	}
+
+	objectCount += addedObjects;
+
+	printf("Finished parsing scene. Resulting objectCount = %d\n", objectCount);
+
+//	int i;
+	for (int i = 0; i < objectCount; i++) {
+        printf("Object #%d: %d\n", i, objects[i].type);
 	}
 
 	fclose(f);
@@ -266,10 +393,10 @@ void displayScene(void) {
 	// renders the title at the top
 	glColor3f(1.f, 1.f, 1.f);
 	glRasterPos2i(4, height - 16);
-	if (amiSmallptCPU)
-		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptCPU v1.6 (Written by David Bucciarelli)");
-	else
-		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptGPU v1.6 (Written by David Bucciarelli)");
+//	if (amiSmallptCPU)
+//		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptCPU v1.6 (Written by David Bucciarelli)");
+//	else
+//		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptGPU v1.6 (Written by David Bucciarelli)");
 
 	// renders the stats at the bottom
 	glColor3f(1.f, 1.f, 1.f);
@@ -277,9 +404,9 @@ void displayScene(void) {
 	renderString(GLUT_BITMAP_HELVETICA_18, captionBuffer);
 
 	// renders the help box with its instructions
-	if (shouldRenderHelp) {
-		renderHelp();
-	}
+//	if (shouldRenderHelp) {
+//		renderHelp();
+//	}
 
 	glutSwapBuffers();
 }
@@ -476,19 +603,25 @@ void specialKeyboard(int key, int x, int y) {
 /// Initializes glut and opengl to sensible defaults.
 ///
 void initGlut(int argc, char *argv[], char *windowTittle) {
+    printf("About to init window stuff...\n");
     glutInitWindowSize(width, height);
     glutInitWindowPosition(0,0);
+    printf("About to init glut displaymode...\n");
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+    printf("About to init glut...\n");
 	glutInit(&argc, argv);
 
+    printf("About to create window...\n");
 	glutCreateWindow(windowTittle);
 
+    printf("About to register callbacks...\n");
     glutReshapeFunc(reshape);
     glutKeyboardFunc(keyboard);
     glutSpecialFunc(specialKeyboard);
     glutDisplayFunc(displayScene);
 	glutIdleFunc(update);
 
+    printf("About to config viewport and projection...\n");
 	glViewport(0, 0, width, height);
 	glLoadIdentity();
 	glOrtho(0.f, width - 1.f, 0.f, height - 1.f, -1.f, 1.f);

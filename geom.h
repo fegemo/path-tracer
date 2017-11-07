@@ -42,14 +42,15 @@ enum Refl {
 
 
 enum ObjectType {
-    SPHERE, TRIANGLE
+    SPHERE, TRIANGLE, MODEL
 };
 
 typedef struct {
     // for any type: type and material
-    enum ObjectType type;
-    vec emission, color;
-    enum Refl refl;
+    int type;
+    int refl;
+    vec emission;
+    vec color;
 
     // for spheres:
     float radius;

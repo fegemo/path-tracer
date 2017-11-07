@@ -96,7 +96,7 @@ __kernel void radianceGPU(
 	// shoots the ray in the scene and receives back a radiance value
 	// the output is returned on "radiance"
 	vec radiance;
-	RadiancePathTracing(object, objectCount, &ray, &seed0, &seed1, &radiance);
+	RadiancePT3(object, objectCount, &ray, &seed0, &seed1, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
