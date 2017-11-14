@@ -47,19 +47,21 @@ enum ObjectType {
 
 typedef struct {
     // for any type: type and material
-    int type;
-    int refl;
-    vec emission;
-    vec color;
+    short type;         // 2
+    short refl;         // 4
+    vec emission;       // 16
+    vec color;          // 28
 
     // for spheres:
-    float radius;
-    vec center;
+    float radius;       // 32
+    vec center;         // 44
 
     // for triangles:
-    vec p1, p2, p3;
+    vec p1, p2, p3;     // 80
 
-    // for ??:
+    // for objects that are lights (ie, emit color):
+    float area;         // 84
+
 } Object;
 
 #endif	/* _GEOM_H */

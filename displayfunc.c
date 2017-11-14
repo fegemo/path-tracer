@@ -60,9 +60,6 @@ int height = 480;
 unsigned int *pixels;
 char captionBuffer[256];
 
-static int shouldRenderHelp = 1;
-//static int currentSphere;
-
 double wallClockTime() {
 #if defined(__linux__) || defined(__APPLE__)
 	struct timeval t;
@@ -102,42 +99,19 @@ static void renderString(void *font, const char *string) {
 }
 
 ///
-/// Renders the help box to the opengl window
-///
-static void renderHelp() {
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glColor4f(0.f, 0.f, 0.5f, 0.5f);
-	glRecti(40, 40, 600, 440);
-
-	glColor3f(1.f, 1.f, 1.f);
-	glRasterPos2i(300, 420);
-	renderString(GLUT_BITMAP_HELVETICA_18, "Help");
-
-	glRasterPos2i(60, 390);
-	renderString(GLUT_BITMAP_HELVETICA_18, "h - toggle Help");
-	glRasterPos2i(60, 360);
-	renderString(GLUT_BITMAP_HELVETICA_18, "arrow Keys - rotate camera left/right/up/down");
-	glRasterPos2i(60, 330);
-	renderString(GLUT_BITMAP_HELVETICA_18, "a and d - move camera left and right");
-	glRasterPos2i(60, 300);
-	renderString(GLUT_BITMAP_HELVETICA_18, "w and s - move camera forward and backward");
-	glRasterPos2i(60, 270);
-	renderString(GLUT_BITMAP_HELVETICA_18, "r and f - move camera up and down");
-	glRasterPos2i(60, 240);
-	renderString(GLUT_BITMAP_HELVETICA_18, "PageUp and PageDown - move camera target up and down");
-	glRasterPos2i(60, 210);
-	renderString(GLUT_BITMAP_HELVETICA_18, "+ and - - to select next/previous object");
-	glRasterPos2i(60, 180);
-	renderString(GLUT_BITMAP_HELVETICA_18, "2, 3, 4, 5, 6, 8, 9 - to move selected object");
-
-	glDisable(GL_BLEND);
-}
-
-///
 /// Reads a scene file and saves the objects in the objects global array.
 ///
 void readScene(char *fileName) {
+//    printf("type: %d\n", offsetof(Object, type));
+//    printf("refl: %d\n", offsetof(Object, refl));
+//    printf("emission: %d\n", offsetof(Object, emission));
+//    printf("color: %d\n", offsetof(Object, color));
+//    printf("radius: %d\n", offsetof(Object, radius));
+//    printf("center: %d\n", offsetof(Object, center));
+//    printf("p1: %d\n", offsetof(Object, p1));
+//    printf("p2: %d\n", offsetof(Object, p2));
+//    printf("p3: %d\n", offsetof(Object, p3));
+//    printf("area: %d\n", offsetof(Object, area));
 	fprintf(stderr, "Reading scene: %s\n", fileName);
 
 	FILE *f = fopen(fileName, "r");
@@ -164,7 +138,7 @@ void readScene(char *fileName) {
 	fprintf(stderr, "Scene size: %d\n", objectCount);
 
 	// line 3+: object descriptors
-	printf("Allocated objects to have %d positions.\n", objectCount);
+//	printf("Allocated objects to have %d positions.\n", objectCount);
 	objects = (Object *)malloc(sizeof(Object) * objectCount);
 	unsigned int lineIndex;
 	unsigned int addedObjects = 0;
@@ -178,7 +152,7 @@ void readScene(char *fileName) {
             fprintf(stderr, "Failed to read object description type. Expected 1, found %d value(s)\n", readValuesCount);
             exit(-1);
         }
-        printf("reading an object of type %s and saving on position %d.\n", objectTypeString, lineIndex + addedObjects);
+//        printf("reading an object of type %s and saving on position %d.\n", objectTypeString, lineIndex + addedObjects);
 
 		if (strcmp(objectTypeString, "sphere") == 0) {
 		    obj->type = SPHERE;
@@ -199,6 +173,8 @@ void readScene(char *fileName) {
                     break;
             }
 
+            obj->area = 4 * FLOAT_PI * obj->radius*obj->radius;
+
             if (readValuesCount != 11) {
                 fprintf(stderr, "Failed to read sphere #%d: %d\n", lineIndex, readValuesCount);
                 exit(-1);
@@ -206,6 +182,7 @@ void readScene(char *fileName) {
 
 		} else if (strcmp(objectTypeString, "triangle") == 0) {
 		    obj->type = TRIANGLE;
+		    Object *tri = obj;
             readValuesCount = fscanf(f, "%f %f %f  %f %f %f  %f %f %f  %f %f %f  %f %f %f  %d\n",
                 &obj->p1.x, &obj->p1.y, &obj->p1.z,
                 &obj->p2.x, &obj->p2.y, &obj->p2.z,
@@ -223,6 +200,39 @@ void readScene(char *fileName) {
                     exit(-1);
                     break;
             }
+
+
+                // sets a center of the triangle (in case it's a light source) and its radius
+                vclr(tri->center)
+                vadd(tri->center, tri->p1, tri->center);
+                vadd(tri->center, tri->p2, tri->center);
+                vadd(tri->center, tri->p3, tri->center);
+                vsmul(tri->center, 1/3.0f, tri->center);
+
+                // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
+                // the area of the circle outside the triangle is (abc)/4area
+                float a, b, c;
+                a = dist(tri->p2, tri->p1);
+                b = dist(tri->p3, tri->p2);
+                c = dist(tri->p1, tri->p3);
+                vec e1; vsub(e1, tri->p2, tri->p1);
+                vec e2; vsub(e2, tri->p3, tri->p1);
+                vec normal; vxcross(normal, e1, e2);
+                tri->area = norm(normal) * 0.5f;
+                tri->radius = (a*b*c)/(4*tri->area);
+                vnorm(normal);
+
+                printf("tri #%d normal: %.2f %.2f %.2f\n", lineIndex + addedObjects, normal.x, normal.y, normal.z);
+
+
+                if (!viszero(tri->emission)) {
+                    printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", tri->p1.x, tri->p1.y, tri->p1.z, tri->p2.x, tri->p2.y, tri->p2.z, tri->p3.x, tri->p3.y, tri->p3.z);
+                    printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
+                    printf("Area: %f\n", tri->area);
+                    printf("Raio: %f\n", tri->radius);
+                }
+
+
 
             if (readValuesCount != 16) {
                 fprintf(stderr, "Failed to read triangle #%d: %d\n", lineIndex, readValuesCount);
@@ -267,7 +277,7 @@ void readScene(char *fileName) {
             }
 
 //            unsigned int flags = TINYOBJ_FLAG_TRIANGULATE;
-            unsigned int flags = NULL;
+            unsigned int flags = (unsigned int) NULL;
             int ret = tinyobj_parse_obj(&attrib, &shapes, &num_shapes, &materials,
                                     &num_materials, data, data_len, flags);
             if (ret != TINYOBJ_SUCCESS) {
@@ -326,7 +336,22 @@ void readScene(char *fileName) {
                 vsmul(tri->center, 1/3.0f, tri->center);
 
                 // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
-                tri->radius = 7;//max(max(fabs(p1.x )))
+                // the area of the circle outside the triangle is (abc)/4area
+                float a, b, c;
+                a = dist(tri->p2, tri->p1);
+                b = dist(tri->p3, tri->p2);
+                c = dist(tri->p1, tri->p3);
+                vec e1; vsub(e1, tri->p2, tri->p1);
+                vec e2; vsub(e2, tri->p3, tri->p1);
+                vec normal; vxcross(normal, e1, e2);
+                tri->area = norm(normal) * 0.5f;
+                tri->radius = (a*b*c)/(4*tri->area);
+
+
+                if (!viszero(tri->emission)) {
+                    printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
+                    printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
+                }
 
 
                 faceOffset += 3;
@@ -342,9 +367,9 @@ void readScene(char *fileName) {
 	printf("Finished parsing scene. Resulting objectCount = %d\n", objectCount);
 
 //	int i;
-	for (int i = 0; i < objectCount; i++) {
-        printf("Object #%d: %d\n", i, objects[i].type);
-	}
+//	for (int i = 0; i < objectCount; i++) {
+//        printf("Object #%d: %d\n", i, objects[i].type);
+//	}
 
 	fclose(f);
 }
@@ -402,11 +427,6 @@ void displayScene(void) {
 	glColor3f(1.f, 1.f, 1.f);
 	glRasterPos2i(4, 10);
 	renderString(GLUT_BITMAP_HELVETICA_18, captionBuffer);
-
-	// renders the help box with its instructions
-//	if (shouldRenderHelp) {
-//		renderHelp();
-//	}
 
 	glutSwapBuffers();
 }
@@ -536,9 +556,6 @@ void keyboard(unsigned char key, int x, int y) {
 //			spheres[currentSphere].p.y -= 0.5f * MOVE_STEP;
 //			reInitSceneObjects();
 //			break;
-		case 'h':
-			shouldRenderHelp = (!shouldRenderHelp);
-			break;
 		default:
 			break;
 	}

@@ -56,7 +56,8 @@ __kernel void radianceGPU(
 	const unsigned int objectCount,
 	const int width, const int height,
 	const int currentSample,
-	__global int *pixels) {
+	__global int *pixels,
+	__global int *debug) {
 
     const int gid = get_global_id(0);
 	const int gid2 = 2 * gid;

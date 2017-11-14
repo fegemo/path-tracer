@@ -1,19 +1,32 @@
 camera 0 45 205.6  0 44.957388 204.6
-size 11
-model models/plane-x.obj -89 69 0    1 70 60  0 0 0  0.75 .25 0.25  0
+size 13
 model models/plane-x.obj  90 69 0   -1 70 60  0 0 0  0.25 .25 0.75  0
+model models/plane-x.obj -89 69 0    1 70 60  0 0 0  0.75 .25 0.25  0
 model models/plane-y.obj  0  0 0    100 -1 100  0 0 0  0.75 .75 0.75  0
-model models/monkey.obj  0 10 0  16 16 16 0 0 0  0.4 0.7 0.1  0
+model models/cube.obj  0 10 0  16 16 16  0 0 0  0.4 0.7 0.1  0
 model models/plane-y.obj  0 100 0   100 1 100  0 0 0  0.75 .75 0.75  0
 model models/plane-z.obj  0 70 -60   100 75 1  0 0 0  0.75 .75 0.75  0
-model models/plane-y.obj  0 98 0  10 -1 10  12 12 12  0 0 0  0
 model models/table.obj  27 6 47  16 16 16  0 0 0  0.5 0.2 0  0
-model models/d20.obj  27 24 47  2 2 2  0 0 0  0.7 0.7 0.4  1
+model models/teapot.obj 21 21 44  2.5 2.5 2.5  0 0 0  1 0.9 1  1
+model models/d20.obj  27 24 47  2 2 2  0 0 0  0.7 0.7 0.4  2
 model models/d20.obj  31 24 44  2 2 2  0 0 0  0.3 0.7 0.6  1
-model models/d20.obj  23.5 24 47.5  2 2 2  0 0 0  0.7 0.2 0.7  1
+model models/d20.obj  23.5 24 47.5  2 2 2  0 0 0  0.7 0.2 0.7  0
+triangle  10 99 10  -10 99 -10  10 99 -10  8 8 8  0 0 0  0
+triangle  -10 99 10  -10 99 -10  10 99 10  8 8 8  0 0 0  0
 
 
-sphere 20  0 45 160  0 0 0  1 1 1  2
+
+
+# light: sphere with luminaire
+model models/light.obj  0 88 0  11 6 11  0 0 0  1 1 0.5  1
+sphere 6  0 88 0  12 12 12  0 0 0  0
+
+# light: simple sphere
 sphere 7      0 80 0      12 12 12  0 0 0          0
-sphere 20      0 0 0      0 0 0  0.75 0.25 0.25          0
-model models/cube.obj  0 0 0  20 20 10  0.1 0.2 0.3  0.75 0.25 0.25  0
+
+# light: a plane
+model models/plane-y-down.obj  0 99 20  10 1 10  12 12 12  0 0 0  0
+
+# light: a square
+triangle  10 99 10  10 99 -10  -10 99 -10  1 1 1  0 0 0  0
+triangle  -10 99 10  10 99 10  -10 99 -10  1 1 1  0 0 0  0

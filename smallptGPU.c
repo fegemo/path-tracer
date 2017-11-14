@@ -57,6 +57,7 @@ static cl_mem pixelBuffer;
 static cl_mem seedBuffer;
 static cl_mem objectBuffer;
 static cl_mem cameraBuffer;
+static cl_mem debugBuffer;
 static cl_command_queue commandQueue;
 static cl_program program;
 static cl_kernel kernel;
@@ -69,6 +70,7 @@ Camera camera;
 static int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
+int *debug;
 
 ///
 /// Frees the color, pixel and random seeds buffer from vram and ram.
@@ -119,6 +121,7 @@ static void allocateOutputBuffers() {
 		pixels[i] = i;
 	}
 
+    debug = (int*)malloc(10*sizeof(int));
 
 	// creates the color buffer, from which the opencl program can write (results) and read (what for?)
 	cl_int status;
@@ -144,6 +147,13 @@ static void allocateOutputBuffers() {
             &status);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to create OpenCL pixel buffer: %d\n", status);
+		exit(-1);
+    }
+
+    sizeBytes = sizeof(int) * 10;
+    debugBuffer = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeBytes, NULL, &status);
+	if (status != CL_SUCCESS) {
+		fprintf(stderr, "Failed to create OpenCL debugs buffer: %d\n", status);
 		exit(-1);
     }
 
@@ -495,7 +505,7 @@ static void setUpOpenCL() {
 	commandQueue = clCreateCommandQueue(
 			context,
 			devices[0],
-			NULL,
+			(unsigned int)NULL,
 			&status);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to create OpenCL command queue: %d\n", status);
@@ -819,6 +829,17 @@ void updateRendering() {
 		exit(-1);
 	}
 
+	// sets the value of the debug buffer (to debug the Object struct alignment/packing)
+	status = clSetKernelArg(
+			kernel,
+			9,
+			sizeof(cl_mem),
+			(void *)&debugBuffer);
+	if (status != CL_SUCCESS) {
+		fprintf(stderr, "Failed to set OpenCL arg. #10: %d\n", status);
+		exit(-1);
+	}
+
 
 	// asks the device to execute the kernel
 	if (currentSample < 20) {
@@ -862,6 +883,25 @@ void updateRendering() {
 		fprintf(stderr, "Failed to read the OpenCL pixel buffer: %d\n", status);
 		exit(-1);
 	}
+
+	status = clEnqueueReadBuffer(
+			commandQueue,
+			debugBuffer,
+			CL_TRUE,
+			0,
+			10 * sizeof(int),
+			debug,
+			0,
+			NULL,
+			NULL);
+	if (status != CL_SUCCESS) {
+		fprintf(stderr, "Failed to read the OpenCL debug buffer: %d\n", status);
+		exit(-1);
+	} else {
+	    printf("sizeof(Object) [CPU]: %d\n", sizeof(Object));
+        printf("sizeof(Object) [GPU]: %d\n", debug[0]);
+	}
+
 
 	/*------------------------------------------------------------------------*/
 
@@ -958,6 +998,7 @@ int main(int argc, char *argv[]) {
 
 	updateCamera();
 
+    setenv("CUDA_CACHE_DISABLE", "1", 1);
 	setUpOpenCL();
 
 	initGlut(argc, argv, "SmallPT GPU V1.6 (Written by David Bucciarelli)");

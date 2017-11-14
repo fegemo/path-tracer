@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/obj-model.scn" />
+				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/cornell.scn" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -27,7 +27,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="480 320 scenes/cornell.scn" />
+				<Option parameters="480 320 scenes/simple.scn" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -54,30 +54,21 @@
 		<Unit filename="displayfunc.h" />
 		<Unit filename="geom.h" />
 		<Unit filename="geomfunc.h" />
-		<Unit filename="models/cube.mtl">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="models/cube.obj">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="models/cylinder.obj">
-			<Option target="gpu" />
-		</Unit>
-		<Unit filename="models/d20.obj">
-			<Option target="gpu" />
-		</Unit>
-		<Unit filename="models/monkey.obj">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="models/plane-x.obj">
-			<Option target="gpu" />
-		</Unit>
-		<Unit filename="models/plane-y.obj">
-			<Option target="gpu" />
-		</Unit>
-		<Unit filename="models/plane-z.obj">
-			<Option target="gpu" />
-		</Unit>
+		<Unit filename="models/cube-rotated-other.obj" />
+		<Unit filename="models/cube-rotated.obj" />
+		<Unit filename="models/cube.mtl" />
+		<Unit filename="models/cube.obj" />
+		<Unit filename="models/cylinder.obj" />
+		<Unit filename="models/d20.obj" />
+		<Unit filename="models/light.obj" />
+		<Unit filename="models/monkey.obj" />
+		<Unit filename="models/plane-x.obj" />
+		<Unit filename="models/plane-y-down.obj" />
+		<Unit filename="models/plane-y.obj" />
+		<Unit filename="models/plane-z.obj" />
+		<Unit filename="models/plane.obj" />
+		<Unit filename="models/table.obj" />
+		<Unit filename="models/teapot.obj" />
 		<Unit filename="rendering_kernel.cl">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
@@ -105,6 +96,7 @@
 		<Unit filename="scenes/simple.scn">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="scenes/table-and-mirror.scn" />
 		<Unit filename="simplernd.h" />
 		<Unit filename="smallptCPU.c">
 			<Option compilerVar="CC" />

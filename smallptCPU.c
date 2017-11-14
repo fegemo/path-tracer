@@ -104,8 +104,9 @@ void updateRendering(void) {
 //			RadianceDirectLighting(objects, objectCount, &ray,
 //					&seeds[i2], &seeds[i2 + 1], &radiance);
 
-			if (currentSample == 0)
+			if (currentSample == 0) {
 				colors[i] = radiance;
+			}
 			else {
 				const float k1 = currentSample;
 				const float k2 = 1.f / (k1 + 1.f);

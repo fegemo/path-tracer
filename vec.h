@@ -44,6 +44,8 @@ typedef struct {
 #define vxcross(v, a, b) vinit(v, (a).y * (b).z - (a).z * (b).y, (a).z * (b).x - (a).x * (b).z, (a).x * (b).y - (a).y * (b).x)
 #define vfilter(v) ((v).x > (v).y && (v).x > (v).z ? (v).x : (v).y > (v).z ? (v).y : (v).z)
 #define viszero(v) (((v).x == 0.f) && ((v).x == 0.f) && ((v).z == 0.f))
+#define norm(v) (sqrt((v).x*(v).x + (v).y*(v).y + (v).z*(v).z))
+#define dist(a, b) (sqrt( ((a).x-(b).x)*((a).x-(b).x)  +   ((a).y-(b).y)*((a).y-(b).y)   +   ((a).z-(b).z)*((a).z-(b).z)))
 
 #ifndef GPU_KERNEL
 #define clamp(x, a, b) ((x) < (a) ? (a) : ((x) > (b) ? (b) : (x)))

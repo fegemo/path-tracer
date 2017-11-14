@@ -132,6 +132,17 @@ static void UniformSampleSphere(const float u1, const float u2, vec *v) {
 }
 
 ///
+/// finds a random point on a triangle
+///  u1, u2 are random [0,1]
+///  (u,v) is the barycentric coordinates for the output point
+///
+static void UniformSampleTriangle(const float u1, const float u2, float *u, float *v) {
+    float su1 = (float)sqrt(u1);
+    *u = 1.0f - su1;
+    *v = u2 * su1;
+}
+
+///
 /// checks if a ray intersects an object in the scene and returns the intersection information
 ///
 static int Intersect(
@@ -228,34 +239,62 @@ static void SampleLights(
 	unsigned int i;
 	for (i = 0; i < objectCount; i++) {
 		OCL_CONSTANT_BUFFER const Object *light = &objects[i];
+		if (light->type == MODEL) continue;
 		if (!viszero(light->emission)) {
-			// this is a light source (it has an emission component)...
+			// this is a light source (as it has an emission component)...
 			// the shadow ray starts at the hitPoint and goes to a random point on the light
 			Ray shadowRay;
 			shadowRay.o = *hitPoint;
 
 			// choose a random point over the area of the light source
-			// ASSUMES SPHERE (...i think... maybe this could be applicable to "bounding spheres"...)
-			// first we find a random point in a unit sphere, then we multiply it by the light sphere radius
-			// and then we find the point in world coordinates (by adding the light sphere center coords)
-			vec unitSpherePoint;
-			UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
-			vec spherePoint;
-			vsmul(spherePoint, light->radius, unitSpherePoint);
-			vadd(spherePoint, spherePoint, light->center);
+			vec lightPoint;
+			vec lightNormalWhereShadowRayHit;
+			switch (light->type) {
+            case TRIANGLE:
+                {
+                    float barycentricU, barycentricV;
+                    vec e1, e2;
+                    UniformSampleTriangle(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &barycentricU, &barycentricV);
+                    vsub(e1, light->p2, light->p1)
+                    vsub(e2, light->p3, light->p1)
+                    vsmul(e1, barycentricU, e1);
+                    vsmul(e2, barycentricV, e2);
+                    vassign(lightPoint, light->p1);
+                    vadd(lightPoint, lightPoint, e1);
+                    vadd(lightPoint, lightPoint, e2);
+
+                    // sets what is the normal on the triangle where the shadow ray hit it
+                    // (it's the same regardless of the point because it's a triangle)
+                    vxcross(lightNormalWhereShadowRayHit, e1, e2);
+                    vnorm(lightNormalWhereShadowRayHit);
+                }
+                break;
+
+            case SPHERE:
+            default:
+                {
+
+                    vec unitSpherePoint;
+                    UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
+                    vsmul(lightPoint, light->radius, unitSpherePoint);
+                    vadd(lightPoint, lightPoint, light->center);
+
+                    // sets what is the normal on the triangle where the shadow ray hit it
+                    vassign(lightNormalWhereShadowRayHit, unitSpherePoint);
+                }
+			}
 
 			// configures the direction of the shadow ray, finds its length (keep it on len)
 			// and then normalizes the direction vector
-			vsub(shadowRay.d, spherePoint, *hitPoint);
+			vsub(shadowRay.d, lightPoint, *hitPoint);
 			const float len = sqrt(vdot(shadowRay.d, shadowRay.d));
 			vsmul(shadowRay.d, 1.f / len, shadowRay.d);
 
-			// finds the angle between shadow and the light sphere normal
+			// finds the angle between shadow and the light normal
 			// if it is accute (ie, dot > 0, we hit the backside of the light
-            //    ...unitSpherePoint is a vector that points from the sphere center to its surface point
-			float wo = vdot(shadowRay.d, unitSpherePoint);
+			float wo = vdot(shadowRay.d, lightNormalWhereShadowRayHit);
 			if (wo > 0.f) {
-				// we hit the other half of the sphere... should ignore it
+				// we hit the other half of the light... should ignore it
 				continue;
 			} else {
 			    // we just flip the sign of the cosine because we want it positive
@@ -269,10 +308,10 @@ static void SampleLights(
 			if ((wi > 0.f) && (!IntersectP(objects, objectCount, &shadowRay, len - EPSILON))) {
                 // the object faces the light (wi > 0) and the shadow ray doesnt intersect anything
                 //
-                //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
-                //     ...where did this formula come from?
 				vec lightColor; vassign(lightColor, light->emission);
-				const float s = (4.f * FLOAT_PI * light->radius * light->radius) * wi * wo / (len *len);
+                //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
+//				const float s = 4 * FLOAT_PI * light->radius * light->radius * wi * wo / (len *len);
+				const float s = light->area * wi * wo / (len *len);
 				vsmul(lightColor, s, lightColor);
 
 				// last, we add the direct contribution of this light to the output Ld radiance
