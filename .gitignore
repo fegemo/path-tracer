@@ -1,7 +1,7 @@
 preprocessed_rendering_kernel.cl
 preprocessed_rendering_kernel_dl.cl
-smallptGPU
-smallptCPU
+gpu
+cpu
 path-tracer
 *.o
 build/

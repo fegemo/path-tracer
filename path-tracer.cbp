@@ -7,10 +7,11 @@
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="gpu">
-				<Option output="./path-tracer" prefix_auto="1" extension_auto="1" />
+				<Option output="./gpu" prefix_auto="1" extension_auto="1" />
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
 				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/obj-model.txt" />
 				<Compiler>
 					<Add option="-Wall" />
@@ -23,10 +24,11 @@
 				</Linker>
 			</Target>
 			<Target title="cpu">
-				<Option output="./path-tracer-cpu" prefix_auto="1" extension_auto="1" />
+				<Option output="./cpu" prefix_auto="1" extension_auto="1" />
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
+				<Option use_console_runner="0" />
 				<Option parameters="480 320 scenes/cornell-original.txt" />
 				<Compiler>
 					<Add option="-Wall" />
@@ -47,6 +49,7 @@
 			<Add before="cpp &lt; rendering_kernel.cl &gt;preprocessed_rendering_kernel.cl" />
 			<Add before="cpp &lt; rendering_kernel_dl.cl &gt;preprocessed_rendering_kernel_dl.cl" />
 		</ExtraCommands>
+		<Unit filename="Makefile" />
 		<Unit filename="camera.h" />
 		<Unit filename="displayfunc.c">
 			<Option compilerVar="CC" />
@@ -54,6 +57,14 @@
 		<Unit filename="displayfunc.h" />
 		<Unit filename="geom.h" />
 		<Unit filename="geomfunc.h" />
+		<Unit filename="main-cpu.c">
+			<Option compilerVar="CC" />
+			<Option target="cpu" />
+		</Unit>
+		<Unit filename="main-gpu.c">
+			<Option compilerVar="CC" />
+			<Option target="gpu" />
+		</Unit>
 		<Unit filename="models/cube-rotated-other.obj" />
 		<Unit filename="models/cube-rotated.obj" />
 		<Unit filename="models/cube.mtl" />
@@ -101,14 +112,6 @@
 		</Unit>
 		<Unit filename="scenes/table-and-mirror.scn" />
 		<Unit filename="simplernd.h" />
-		<Unit filename="smallptCPU.c">
-			<Option compilerVar="CC" />
-			<Option target="cpu" />
-		</Unit>
-		<Unit filename="smallptGPU.c">
-			<Option compilerVar="CC" />
-			<Option target="gpu" />
-		</Unit>
 		<Unit filename="tinyobj_loader_c.h" />
 		<Unit filename="vec.h" />
 		<Extensions>

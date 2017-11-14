@@ -114,7 +114,7 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 	updateCamera();
 	currentSample = 0;
 	updateRendering();
-}sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
+}
 
 int main(int argc, char *argv[]) {
 	fprintf(stderr, "Usage: %s\n", argv[0]);
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
 	} else if (argc == 1) {
 		width = 480;
 		height = 320;
-		sceneName = "scenes/cornell.txt";
+		sceneName = "scenes/cornell-original.txt";
 	} else {
 		exit(-1);
 	}
