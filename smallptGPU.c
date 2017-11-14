@@ -955,7 +955,7 @@ int main(int argc, char *argv[]) {
 		kernelFileName = "rendering_kernel.cl";
 		width = 480;
 		height = 320;
-		sceneName = "scenes/cornell.scn";
+		sceneName = "scenes/cornell.txt";
 	} else {
 		exit(-1);
     }
@@ -967,7 +967,7 @@ int main(int argc, char *argv[]) {
 	setUpOpenCL();
 
 	char windowTitle[150];
-	sprintf(windowTitle, "Fegemo's Path Tracer: %s (%d objects)", sceneName, numberOfObjects);
+	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
 	initGlut(argc, argv, windowTitle);
 
     glutMainLoop();

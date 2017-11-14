@@ -114,7 +114,7 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 	updateCamera();
 	currentSample = 0;
 	updateRendering();
-}
+}sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
 
 int main(int argc, char *argv[]) {
 	fprintf(stderr, "Usage: %s\n", argv[0]);
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
 	} else if (argc == 1) {
 		width = 480;
 		height = 320;
-		sceneName = "scenes/obj-model.scn";
+		sceneName = "scenes/cornell.txt";
 	} else {
 		exit(-1);
 	}
@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
 
 	printf("About to init glut...\n");
 	char windowTitle[150];
-	sprintf(windowTitle, "Fegemo's Path Tracer: %s (%d objects)", sceneName, numberOfObjects);
+	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
 	initGlut(argc, argv, windowTitle);
 
 	printf("About to start the main loop...\n");
