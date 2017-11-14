@@ -1,42 +1,8 @@
-/*
-Copyright (c) 2009 David Bucciarelli (davibu@interfree.it)
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#ifdef WIN32
-#define _USE_MATH_DEFINES
-#endif
 #include <math.h>
-
-#if defined(__linux__) || defined(__APPLE__)
 #include <sys/time.h>
-#elif defined (WIN32)
-#include <windows.h>
-#else
-        Unsupported Platform !!!
-#endif
 
 #include "camera.h"
 #include "geom.h"
@@ -53,24 +19,16 @@ extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
 
-int amiSmallptCPU;
-
 int width = 640;
 int height = 480;
 unsigned int *pixels;
 char captionBuffer[256];
 
 double wallClockTime() {
-#if defined(__linux__) || defined(__APPLE__)
 	struct timeval t;
 	gettimeofday(&t, NULL);
 
 	return t.tv_sec + t.tv_usec / 1000000.0;
-#elif defined (WIN32)
-	return GetTickCount() / 1000.0;
-#else
-	Unsupported Platform !!!
-#endif
 }
 
 static const char* readFile(size_t* fileLength, const char* fileName) {
@@ -101,17 +59,7 @@ static void renderString(void *font, const char *string) {
 ///
 /// Reads a scene file and saves the objects in the objects global array.
 ///
-void readScene(char *fileName) {
-//    printf("type: %d\n", offsetof(Object, type));
-//    printf("refl: %d\n", offsetof(Object, refl));
-//    printf("emission: %d\n", offsetof(Object, emission));
-//    printf("color: %d\n", offsetof(Object, color));
-//    printf("radius: %d\n", offsetof(Object, radius));
-//    printf("center: %d\n", offsetof(Object, center));
-//    printf("p1: %d\n", offsetof(Object, p1));
-//    printf("p2: %d\n", offsetof(Object, p2));
-//    printf("p3: %d\n", offsetof(Object, p3));
-//    printf("area: %d\n", offsetof(Object, area));
+int readScene(char *fileName) {
 	fprintf(stderr, "Reading scene: %s\n", fileName);
 
 	FILE *f = fopen(fileName, "r");
@@ -372,6 +320,8 @@ void readScene(char *fileName) {
 //	}
 
 	fclose(f);
+
+	return objectCount;
 }
 
 ///
@@ -418,10 +368,6 @@ void displayScene(void) {
 	// renders the title at the top
 	glColor3f(1.f, 1.f, 1.f);
 	glRasterPos2i(4, height - 16);
-//	if (amiSmallptCPU)
-//		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptCPU v1.6 (Written by David Bucciarelli)");
-//	else
-//		renderString(GLUT_BITMAP_HELVETICA_18, "SmallptGPU v1.6 (Written by David Bucciarelli)");
 
 	// renders the stats at the bottom
 	glColor3f(1.f, 1.f, 1.f);

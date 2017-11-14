@@ -1,44 +1,9 @@
-/*
-Copyright (c) 2009 David Bucciarelli (davibu@interfree.it)
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-/*
- * Based on smallpt, a Path Tracer by Kevin Beason, 2008
- * Modified by David Bucciarelli to show the output via OpenGL/GLUT, ported
- * to C, work with float, fixed RR, ported to OpenCL, etc.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
 #include <math.h>
-
-// Jens's patch for MacOS
-#ifdef __APPLE__
-#include <OpenCL/opencl.h>
-#else
 #include <CL/cl.h>
-#endif
 
 #include "camera.h"
 #include "vec.h"
@@ -973,35 +938,37 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 /// Then delivers to glut (glutMainLoop).
 ///
 int main(int argc, char *argv[]) {
-	amiSmallptCPU = 0;
-
 	fprintf(stderr, "Usage: %s\n", argv[0]);
 	fprintf(stderr, "Usage: %s <use CPU/GPU device (0=CPU or 1=GPU)> <workgroup size (0=default value or anything > 0 and power of 2)> <kernel file name> <window width> <window height> <scene file>\n", argv[0]);
 
+	char* sceneName;
 	if (argc == 7) {
 		useGPU = atoi(argv[1]);
 		forceWorkSize = atoi(argv[2]);
 		kernelFileName = argv[3];
 		width = atoi(argv[4]);
 		height = atoi(argv[5]);
-		readScene(argv[6]);
+		sceneName = argv[6];
 	} else if (argc == 1) {
 		useGPU = 1;
 		forceWorkSize = 0;
 		kernelFileName = "rendering_kernel.cl";
 		width = 480;
 		height = 320;
-		readScene("scenes/cornell.scn");
+		sceneName = "scenes/cornell.scn";
 	} else {
 		exit(-1);
     }
+    const int numberOfObjects = readScene(sceneName);
 
 	updateCamera();
 
     setenv("CUDA_CACHE_DISABLE", "1", 1);
 	setUpOpenCL();
 
-	initGlut(argc, argv, "SmallPT GPU V1.6 (Written by David Bucciarelli)");
+	char windowTitle[150];
+	sprintf(windowTitle, "Fegemo's Path Tracer: %s (%d objects)", sceneName, numberOfObjects);
+	initGlut(argc, argv, windowTitle);
 
     glutMainLoop();
 

@@ -1,32 +1,3 @@
-/*
-Copyright (c) 2009 David Bucciarelli (davibu@interfree.it)
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*/
-
-/*
- * Based on smallpt, a Path Tracer by Kevin Beason, 2008
- * Modified by David Bucciarelli to show the output via OpenGL/GLUT, ported
- * to C, work with float, fixed RR, ported to OpenCL, etc.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -146,22 +117,22 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 }
 
 int main(int argc, char *argv[]) {
-	amiSmallptCPU = 1;
-
 	fprintf(stderr, "Usage: %s\n", argv[0]);
 	fprintf(stderr, "Usage: %s <window width> <window height> <scene file>\n", argv[0]);
 
+    char *sceneName;
 	if (argc == 4) {
 		width = atoi(argv[1]);
 		height = atoi(argv[2]);
-		readScene(argv[3]);
+		sceneName = argv[3];
 	} else if (argc == 1) {
 		width = 480;
 		height = 320;
-		readScene("scenes/obj-model.scn");
+		sceneName = "scenes/obj-model.scn";
 	} else {
 		exit(-1);
 	}
+    const int numberOfObjects = readScene(sceneName);
 
 	updateCamera();
 
@@ -169,7 +140,9 @@ int main(int argc, char *argv[]) {
 	allocateBuffers();
 
 	printf("About to init glut...\n");
-	initGlut(argc, argv, "SmallPT CPU V1.6 (Written by David Bucciarelli)");
+	char windowTitle[150];
+	sprintf(windowTitle, "Fegemo's Path Tracer: %s (%d objects)", sceneName, numberOfObjects);
+	initGlut(argc, argv, windowTitle);
 
 	printf("About to start the main loop...\n");
     glutMainLoop( );
