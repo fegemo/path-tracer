@@ -301,6 +301,7 @@ static void SampleLights(
 			    //   ...basically because we want the vector to be from the light sphere surface to its center
 				wo = -wo;
 			}
+			wo = clamp(wo, 0.f, 1.f);
 
 			// now we send the shadow ray to the light and see if it hits another object before it...
 			//   wi > 0 <=> the light is in the outside and in the direction of the hitPoint normal

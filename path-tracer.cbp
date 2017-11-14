@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/cornell.scn" />
+				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/large-object.scn" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -67,6 +67,8 @@
 		<Unit filename="models/plane-y.obj" />
 		<Unit filename="models/plane-z.obj" />
 		<Unit filename="models/plane.obj" />
+		<Unit filename="models/sponge-rotated.obj" />
+		<Unit filename="models/sponge.obj" />
 		<Unit filename="models/table.obj" />
 		<Unit filename="models/teapot.obj" />
 		<Unit filename="rendering_kernel.cl">
@@ -90,6 +92,7 @@
 		<Unit filename="scenes/cornell_large.scn">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="scenes/large-object.scn" />
 		<Unit filename="scenes/obj-model.scn">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
