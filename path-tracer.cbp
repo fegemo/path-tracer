@@ -11,8 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option use_console_runner="0" />
-				<Option parameters="1 0 rendering_kernel.cl 640 480 scenes/obj-model.txt" />
+				<Option parameters="1 0 ray-tracing.cl 640 480 scenes/cornell.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -29,7 +28,7 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Option use_console_runner="0" />
-				<Option parameters="480 320 scenes/cornell-original.txt" />
+				<Option parameters="480 320 scenes/large-object.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -82,35 +81,22 @@
 		<Unit filename="models/sponge.obj" />
 		<Unit filename="models/table.obj" />
 		<Unit filename="models/teapot.obj" />
-		<Unit filename="rendering_kernel.cl">
+		<Unit filename="path-tracing.cl">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
-		<Unit filename="rendering_kernel_dl.cl">
+		<Unit filename="ray-tracing.cl">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
-		<Unit filename="scenes/caustic.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/caustic3.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/complex.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/cornell.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/cornell_large.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/large-object.scn" />
-		<Unit filename="scenes/obj-model.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/simple.scn">
-			<Option target="&lt;{~None~}&gt;" />
-		</Unit>
-		<Unit filename="scenes/table-and-mirror.scn" />
+		<Unit filename="scenes/caustic.txt" />
+		<Unit filename="scenes/caustic3.txt" />
+		<Unit filename="scenes/complex.txt" />
+		<Unit filename="scenes/cornell-original.txt" />
+		<Unit filename="scenes/cornell.txt" />
+		<Unit filename="scenes/cornell_large.txt" />
+		<Unit filename="scenes/large-object.txt" />
+		<Unit filename="scenes/obj-model.txt" />
+		<Unit filename="scenes/simple.txt" />
+		<Unit filename="scenes/table-and-mirror.txt" />
 		<Unit filename="simplernd.h" />
 		<Unit filename="tinyobj_loader_c.h" />
 		<Unit filename="vec.h" />

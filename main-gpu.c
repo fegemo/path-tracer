@@ -333,7 +333,7 @@ static void setUpOpenCL() {
 
 		fprintf(stderr, "OpenCL Device %d: Compute units = %u\n", i, units);
 
-		// finally, we query and printf the largest work group of this device
+		// now we query and printf the largest work group of this device
 		size_t gsize = 0;
 		status = clGetDeviceInfo(devices[i],
 				CL_DEVICE_MAX_WORK_GROUP_SIZE,
@@ -346,7 +346,20 @@ static void setUpOpenCL() {
 		}
 
 		fprintf(stderr, "OpenCL Device %d: Max. work group size = %d\n", i, (unsigned int)gsize);
-	}
+
+		// finally, we query and printf the amount of constant memory (the fastest) the device has
+		size_t maxConstantMemorySize = 0;
+		status = clGetDeviceInfo(devices[i],
+				CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE,
+				sizeof(size_t),
+				&maxConstantMemorySize,
+				NULL);
+		if (status != CL_SUCCESS) {
+			fprintf(stderr, "Failed to get OpenCL device info: %d\n", status);
+			exit(-1);
+		}
+
+		fprintf(stderr, "OpenCL Device %d: Max. const. mem. size = %d\n", i, (unsigned int)maxConstantMemorySize);	}
 
 	if (!deviceFound) {
 		fprintf(stderr, "Unable to select an appropriate device\n");
@@ -952,7 +965,7 @@ int main(int argc, char *argv[]) {
 	} else if (argc == 1) {
 		useGPU = 1;
 		forceWorkSize = 0;
-		kernelFileName = "rendering_kernel.cl";
+		kernelFileName = "path-tracing.cl";
 		width = 480;
 		height = 320;
 		sceneName = "scenes/cornell.txt";

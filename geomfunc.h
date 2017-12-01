@@ -7,7 +7,7 @@
 #ifndef SMALLPT_GPU
 
 static float SphereIntersect(
-    OCL_CONSTANT_BUFFER const Object *s,
+    OCL_GLOBAL_BUFFER const Object *s,
 	const Ray *r) { /* returns distance, 0 if nohit */
 	vec op; /* Solve t^2*d.d + 2*t*(o-p).d + (o-p).(o-p)-R^2 = 0 */
 	vsub(op, s->center, r->o);
@@ -41,7 +41,7 @@ static float SphereIntersect(
 /// Determines if a ray intersected with a triangle (algorithm from pbrt: 141-2)
 /// Returns the t != 0 if there was a hit.
 ///
-static float TriangleIntersect(OCL_CONSTANT_BUFFER const Object *triangle, const Ray *ray) {
+static float TriangleIntersect(OCL_GLOBAL_BUFFER const Object *triangle, const Ray *ray) {
 
     // calculates s1 = ray.direction x e2
     vec e1; vsub(e1, triangle->p2, triangle->p1);
@@ -76,12 +76,12 @@ static float TriangleIntersect(OCL_CONSTANT_BUFFER const Object *triangle, const
     return 0;
 }
 
-static void SphereNormal(vec *normal, OCL_CONSTANT_BUFFER const Object *sphere, const vec hitPoint) {
+static void SphereNormal(vec *normal, OCL_GLOBAL_BUFFER const Object *sphere, const vec hitPoint) {
     vsub(*normal, hitPoint, sphere->center);
     vnorm(*normal);
 }
 
-static void TriangleNormal(vec *normal, OCL_CONSTANT_BUFFER const Object *triangle, vec hitPoint) {
+static void TriangleNormal(vec *normal, OCL_GLOBAL_BUFFER const Object *triangle, vec hitPoint) {
     vec e1; vsub(e1, triangle->p2, triangle->p1);
     vec e2; vsub(e2, triangle->p3, triangle->p1);
     vxcross(*normal, e1, e2);
@@ -123,7 +123,7 @@ static void UniformSampleTriangle(const float u1, const float u2, float *u, floa
 /// checks if a ray intersects an object in the scene and returns the intersection information
 ///
 static int Intersect(
-    OCL_CONSTANT_BUFFER const Object *objects,
+    OCL_GLOBAL_BUFFER const Object *objects,
 	const unsigned int objectCount,
 	const Ray *ray,
 	float *t,
@@ -160,7 +160,7 @@ static int Intersect(
 ///
 static int IntersectP(
     // scene description
-    OCL_CONSTANT_BUFFER const Object *objects,
+    OCL_GLOBAL_BUFFER const Object *objects,
 	const unsigned int objectCount,
 	// the ray being cast
 	const Ray *ray,
@@ -197,7 +197,7 @@ static int IntersectP(
 ///
 static void SampleLights(
 	// the scene
-	OCL_CONSTANT_BUFFER const Object *objects,
+	OCL_GLOBAL_BUFFER const Object *objects,
 	// the size of the scene
 	const unsigned int objectCount,
 	// random seeds
@@ -215,7 +215,7 @@ static void SampleLights(
 	// for each light...
 	unsigned int i;
 	for (i = 0; i < objectCount; i++) {
-		OCL_CONSTANT_BUFFER const Object *light = &objects[i];
+		OCL_GLOBAL_BUFFER const Object *light = &objects[i];
 		if (light->type == MODEL) continue;
 		if (!viszero(light->emission)) {
 			// this is a light source (as it has an emission component)...
@@ -302,7 +302,7 @@ static void SampleLights(
 
 static void RadiancePathTracing(
     // the scene
-    OCL_CONSTANT_BUFFER const Object *objects,
+    OCL_GLOBAL_BUFFER const Object *objects,
 	// size of the scene
 	const unsigned int objectCount,
 	// primary ray
@@ -339,7 +339,7 @@ static void RadiancePathTracing(
 		}
 
 		// the hit object
-		OCL_CONSTANT_BUFFER const Object *obj = &objects[id];
+		OCL_GLOBAL_BUFFER const Object *obj = &objects[id];
 
 		// the intersection point
 		vec hitPoint;
@@ -401,7 +401,7 @@ static void RadiancePathTracing(
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
 
-			// diffuse component (would be recursive, made iterative for perf.)
+			// diffuse component
 			// ----------------------------------------------------------------
 
 			// we'll sample a position in a unit circle that will be used to find how this currentRay
@@ -516,7 +516,7 @@ static void RadiancePathTracing(
 }
 
 static void RadianceDirectLighting(
-	OCL_CONSTANT_BUFFER const Object *objects,
+	OCL_GLOBAL_BUFFER const Object *objects,
 	const unsigned int objectCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
@@ -543,7 +543,7 @@ static void RadianceDirectLighting(
 			return;
 		}
 
-		OCL_CONSTANT_BUFFER const Object *obj = &objects[id]; /* the hit object */
+		OCL_GLOBAL_BUFFER const Object *obj = &objects[id]; /* the hit object */
 
 		vec hitPoint;
 		vsmul(hitPoint, t, currentRay.d);

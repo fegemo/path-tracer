@@ -34,10 +34,15 @@ typedef struct {
 #define toInt(x) ((int)(pow(clamp(x, 0.f, 1.f), 1.f / 2.2f) * 255.f + .5f))
 
 #define OCL_CONSTANT_BUFFER __constant
-
 #ifndef GPU_KERNEL
 #undef OCL_CONSTANT_BUFFER
 #define OCL_CONSTANT_BUFFER
+#endif
+
+#define OCL_GLOBAL_BUFFER __global
+#ifndef GPU_KERNEL
+#undef OCL_GLOBAL_BUFFER
+#define OCL_GLOBAL_BUFFER
 #endif
 
 #endif	/* _VEC_H */

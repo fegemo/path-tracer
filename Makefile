@@ -10,16 +10,20 @@ default: all
 all: Makefile cpu gpu preprocessed_kernels
 
 cpu: main-cpu.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
-	$(CC) -DSMALLPT_CPU -o cpu main-cpu.c displayfunc.c $(CCFLAGS)
-	./cpu
+	$(CC) -DSMALLPT_CPU -o path-tracer-cpu main-cpu.c displayfunc.c $(CCFLAGS)
 
 gpu: main-gpu.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
-	$(CC) -DSMALLPT_GPU -o gpu main-gpu.c displayfunc.c $(CCFLAGS)
-	./gpu
+	$(CC) -DSMALLPT_GPU -o path-tracer-gpu main-gpu.c displayfunc.c $(CCFLAGS)
+
+run-cpu: cpu
+	./path-tracer-cpu
+
+run-gpu: gpu
+	./path-tracer-gpu
 
 clean:
-	rm -rf main-cpu main-gpu preprocessed_rendering_kernel.cl preprocessed_rendering_kernel_dl.cl
+	rm -rf path-tracer-cpu path-tracer-gpu preprocessed_path_tracing.cl preprocessed_ray_tracing.cl
 
 preprocessed_kernels:
-	cpp <rendering_kernel.cl >preprocessed_rendering_kernel.cl
-	cpp <rendering_kernel_dl.cl >preprocessed_rendering_kernel_dl.cl
+	cpp <path-tracing.cl >preprocessed_path_tracing.cl
+	cpp <ray-tracing.cl >preprocessed_ray_tracing.cl

@@ -7,8 +7,8 @@ sphere 10000  0 40.8 -9730     0 0 0     0 0 0          0
 sphere 10000  0 10000 81.6     0 0 0     0.75 0.75 0.75  0
 sphere 10000  0 -9918.4 81.6  0 0 0      0.75 0.75 0.75  0
 sphere 5   0 75 40        6 6 6      0 0 0    0
-model models/cube-rotated-other.obj  -25 17.5 47  16 35 16  0 0 0  0.75 0.75 0.75  1
-model models/cube-rotated.obj   25 6 67  16 16 16  0 0 0  0.75 0.75 0.75  2
+model models/cube-rotated-other.obj  -25 17.5 47  16 35 16  0 0 0  0.75 0.75 0.75  0
+model models/cube-rotated.obj   25 6 67  16 16 16  0 0 0  0.75 0.75 0.75  0
 
 model models/plane-y-down.obj  0 81 40  10 1 10  12 12 12  0 0 0  0
 triangle 27 16.5 47  73 16.5 78  73 50 47  0 0 0  0.9 0.5 0.1  0

@@ -29,7 +29,7 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 
 __kernel void radianceGPU(
     __global vec *colors, __global unsigned int *seedsInput,
-	OCL_CONSTANT_BUFFER Object *object, OCL_CONSTANT_BUFFER Camera *camera,
+	__global Object *object, OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int objectCount,
 	const int width, const int height,
 	const int currentSample,
@@ -45,7 +45,6 @@ __kernel void radianceGPU(
 	if (y >= height)
 		return;
 
-	/* LordCRC: move seed to local store */
 	unsigned int seed0 = seedsInput[gid2];
 	unsigned int seed1 = seedsInput[gid2 + 1];
 
