@@ -31,7 +31,10 @@ typedef struct {
 #define sign(x) ((x) > 0 ? 1 : -1)
 #endif
 
-#define toInt(x) ((int)(pow(clamp(x, 0.f, 1.f), 1.f / 2.2f) * 255.f + .5f))
+// smallPT's gamma correction:
+//#define toInt(x) ((int)(pow(clamp(x, 0.f, 1.f), 1.f / 2.2f) * 255.f + .5f))
+// no gamma correction:
+#define toInt(x) ((int)(clamp(x, 0.f, 1.f)*255.f))
 
 #define OCL_CONSTANT_BUFFER __constant
 #ifndef GPU_KERNEL

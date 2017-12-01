@@ -319,7 +319,7 @@ static void RadiancePathTracing(
 	unsigned int depth = 0;
 	int specularBounce = 1;
 	for (;; ++depth) {
-		// Removed Russian Roulette in order to improve execution on SIMT
+		// no russian roulette so threads finish at the same time
 		// we bounce the ray for 6 times (primary + 6 = 7)
 		if (depth > 6) {
 			*result = rad;

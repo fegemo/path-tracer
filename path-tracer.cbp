@@ -7,11 +7,11 @@
 		<Option compiler="gcc" />
 		<Build>
 			<Target title="gpu">
-				<Option output="./gpu" prefix_auto="1" extension_auto="1" />
+				<Option output="./path-tracer-gpu" prefix_auto="1" extension_auto="1" />
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 ray-tracing.cl 640 480 scenes/cornell.txt" />
+				<Option parameters="1 0 path-tracing.cl 640 480 scenes/large-object.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -23,7 +23,7 @@
 				</Linker>
 			</Target>
 			<Target title="cpu">
-				<Option output="./cpu" prefix_auto="1" extension_auto="1" />
+				<Option output="./path-tracer-cpu" prefix_auto="1" extension_auto="1" />
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
@@ -45,8 +45,8 @@
 			<Add library="GL" />
 		</Linker>
 		<ExtraCommands>
-			<Add before="cpp &lt; rendering_kernel.cl &gt;preprocessed_rendering_kernel.cl" />
-			<Add before="cpp &lt; rendering_kernel_dl.cl &gt;preprocessed_rendering_kernel_dl.cl" />
+			<Add before="cpp &lt; path-tracing.cl &gt;preprocessed_path_tracing.cl" />
+			<Add before="cpp &lt; ray-tracing.cl &gt;preprocessed_ray_tracing.cl" />
 		</ExtraCommands>
 		<Unit filename="Makefile" />
 		<Unit filename="camera.h" />
@@ -70,6 +70,7 @@
 		<Unit filename="models/cube.obj" />
 		<Unit filename="models/cylinder.obj" />
 		<Unit filename="models/d20.obj" />
+		<Unit filename="models/half-monkey.obj" />
 		<Unit filename="models/light.obj" />
 		<Unit filename="models/monkey.obj" />
 		<Unit filename="models/plane-x.obj" />

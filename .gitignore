@@ -1,7 +1,7 @@
-preprocessed_rendering_kernel.cl
-preprocessed_rendering_kernel_dl.cl
-gpu
-cpu
+preprocessed_path_tracing.cl
+preprocessed_ray_tracing.cl
+path-tracer-gpu
+path-tracer-cpu
 path-tracer
 *.o
 build/
