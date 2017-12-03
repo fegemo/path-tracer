@@ -9,11 +9,11 @@ default: all
 
 all: Makefile cpu gpu preprocessed_kernels
 
-cpu: main-cpu.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
-	$(CC) -DSMALLPT_CPU -o path-tracer-cpu main-cpu.c displayfunc.c $(CCFLAGS)
+cpu: main-cpu.c displayfunc.c camera.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
+	$(CC) -DSMALLPT_CPU -o path-tracer-cpu main-cpu.c displayfunc.c camera.c $(CCFLAGS)
 
-gpu: main-gpu.c displayfunc.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
-	$(CC) -DSMALLPT_GPU -o path-tracer-gpu main-gpu.c displayfunc.c $(CCFLAGS)
+gpu: main-gpu.c displayfunc.c camera.c Makefile vec.h camera.h geom.h displayfunc.h simplernd.h geomfunc.h
+	$(CC) -DSMALLPT_GPU -o path-tracer-gpu main-gpu.c displayfunc.c camera.c $(CCFLAGS)
 
 run-cpu: cpu
 	./path-tracer-cpu

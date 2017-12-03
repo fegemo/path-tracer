@@ -3,6 +3,8 @@
 #include <string.h>
 #include <math.h>
 #include <sys/time.h>
+#include <stdbool.h>
+#include <libgen.h>
 
 #include "camera.h"
 #include "geom.h"
@@ -13,16 +15,29 @@
 extern void reInitViewpointDependentBuffers(const int);
 extern void reInitSceneObjects();
 extern void updateRendering();
-extern void updateCamera();
 
 extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
+extern int currentSample;
 
+char sceneTitle[100];
 int width = 640;
 int height = 480;
 unsigned int *pixels;
 char captionBuffer[256];
+
+
+// interaction with the camera
+int mouseX = 0, mouseY = 0;
+int mouseButton = 0;
+bool keyStates[256];
+const float MOVE_STEP = 10.0f;
+const float ROTATE_STEP = (2.f * FLOAT_PI / 180.f);
+
+
+int timeBefore = 0;
+int startUpTime;
 
 double wallClockTime() {
 	struct timeval t;
@@ -56,6 +71,20 @@ static void renderString(void *font, const char *string) {
 	}
 }
 
+
+void stripExtension(char *fileName)
+{
+    char *end = fileName + strlen(fileName);
+
+    while (end > fileName && *end != '.' && *end != '\\' && *end != '/') {
+        --end;
+    }
+
+    if (end > fileName && *end == '.') {
+        *end = '\0';
+    }
+}
+
 ///
 /// Reads a scene file and saves the objects in the objects global array.
 ///
@@ -68,10 +97,18 @@ int readScene(char *fileName) {
 		exit(-1);
 	}
 
+	strcpy(sceneTitle, basename(fileName));
+	stripExtension(sceneTitle);
+
 	// line 1: camera configuration: camera eye.x eye.y eye.z  target.x target.y target.z
 	int c = fscanf(f,"camera %f %f %f  %f %f %f\n",
 			&camera.orig.x, &camera.orig.y, &camera.orig.z,
 			&camera.target.x, &camera.target.y, &camera.target.z);
+	camera.pitch = 0;
+	camera.yaw = 0;
+	camera.width = width;
+	camera.height = height;
+
 	if (c != 6) {
 		fprintf(stderr, "Failed to read 6 camera parameters: %d\n", c);
 		exit(-1);
@@ -324,27 +361,43 @@ int readScene(char *fileName) {
 	return objectCount;
 }
 
-///
-/// updates the camera orthogonal basis according to its origin (orig) and target
-///
-void updateCamera() {
-	vsub(camera.dir, camera.target, camera.orig);
-	vnorm(camera.dir);
+void updateCamera(int delta) {
+    bool cameraMoved = false;
+    float speed =  delta * 0.0001f;
+    vec movement = {0.f, 0.f, 0.f};
 
-	const vec up = {0.f, 1.f, 0.f};
-	const float fov = (M_PI / 180.f) * 45.f;
+    // forward or backward movement
+    if (keyStates['w'] || keyStates['W'] || keyStates['s'] || keyStates['S']) {
+        const int frontOrBack = keyStates['w'] || keyStates['W'] ? 1 : -1;
+        vsmul(movement, frontOrBack, camera.dir);
 
-	// axis x is orthogonal to the camera direction and up
-	vxcross(camera.x, camera.dir, up);
-	vnorm(camera.x);
-	// multiplies x axis by aspectRatio * fov
-	vsmul(camera.x, width * fov / height, camera.x);
+        cameraMoved = true;
+    }
 
-	// axis y is orthogonal to x and camera direction
-	vxcross(camera.y, camera.x, camera.dir);
-	vnorm(camera.y);
-	// multiplies y axis by the fov
-	vsmul(camera.y, fov, camera.y);
+    // lateral movement
+    if (keyStates['a'] || keyStates['A'] || keyStates['d'] || keyStates['D']) {
+        int leftOrRight = keyStates['d'] || keyStates['D'] ? 1 : -1;
+
+        vec direction = camera.x;
+        vnorm(direction);
+        vsmul(direction, leftOrRight, direction);
+
+        vadd(movement, direction, movement);
+        cameraMoved = true;
+    }
+
+    // if there was movement, we scale it by the max speed and integrate it
+    // on the camera position & target
+    if (cameraMoved) {
+        vnorm(movement);
+        vsmul(movement, speed, movement);
+
+        vadd(camera.orig, camera.orig, movement);
+        vadd(camera.target, camera.target, movement);
+
+        updateCameraBasis(&camera);
+        reInitViewpointDependentBuffers(0);
+    }
 }
 
 ///
@@ -352,7 +405,12 @@ void updateCamera() {
 /// asking glut to redraw the window
 ///
 void update(void) {
+    int timeNow = glutGet(GLUT_ELAPSED_TIME);
+    int delta = timeNow - (timeBefore || 0);
+    updateCamera(delta);
 	updateRendering();
+
+	timeBefore = timeNow;
 	glutPostRedisplay();
 }
 
@@ -393,12 +451,34 @@ void reshape(int newWidth, int newHeight) {
 	glutPostRedisplay();
 }
 
-#define MOVE_STEP 10.0f
-#define ROTATE_STEP (2.f * M_PI / 180.f)
+
+/// returns (on the time param) a human readable string for a certain
+/// number of millisseconds, eg, 15ms, 56s, 1m, 24h
+/// numbers are always integers, rounded up or down
+void getHumanReadableTime(int millis, char *time) {
+    if (millis < 1000) {
+        // less than 1s: show in ms
+        sprintf(time, "%ims", millis);
+    } else if (millis < 1000 * 60) {
+        // less than 1min: show in s
+        sprintf(time, "%.0fs", roundf(millis / 1000.f));
+    } else if (millis < 1000 * 60 * 60) {
+        // less than 1h: show in m
+        sprintf(time, "%.0fm", roundf(millis / 1000.f / 60.f));
+    } else {
+        // 1h or more: show in h
+        sprintf(time, "%.0fh", roundf(millis / 1000.f / 60.f / 60.f));
+    }
+}
+
 void keyboard(unsigned char key, int x, int y) {
 	switch (key) {
 		case 'p': {
-			FILE *f = fopen("image.ppm", "w"); // Write image to PPM file.
+		    char fileName[200];
+		    char timeSinceBeginning[20];
+		    getHumanReadableTime(glutGet(GLUT_ELAPSED_TIME), timeSinceBeginning);
+		    sprintf(fileName, "%s-%i-%s.ppm", sceneTitle, currentSample, timeSinceBeginning);
+			FILE *f = fopen(fileName, "w"); // Write image to PPM file.
 			if (!f) {
 				fprintf(stderr, "Failed to open image file: image.ppm\n");
 			} else {
@@ -415,56 +495,9 @@ void keyboard(unsigned char key, int x, int y) {
 			}
 			break;
 		}
-		case 27: /* Escape key */
+		case 27: // ESC
 			fprintf(stderr, "Done.\n");
 			exit(0);
-			break;
-		case ' ': /* Refresh display */
-			reInitViewpointDependentBuffers(1);
-			break;
-		case 'a': {
-			vec dir = camera.x;
-			vnorm(dir);
-			vsmul(dir, -MOVE_STEP, dir);
-			vadd(camera.orig, camera.orig, dir);
-			vadd(camera.target, camera.target, dir);
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case 'd': {
-			vec dir = camera.x;
-			vnorm(dir);
-			vsmul(dir, MOVE_STEP, dir);
-			vadd(camera.orig, camera.orig, dir);
-			vadd(camera.target, camera.target, dir);
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case 'w': {
-			vec dir = camera.dir;
-			vsmul(dir, MOVE_STEP, dir);
-			vadd(camera.orig, camera.orig, dir);
-			vadd(camera.target, camera.target, dir);
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case 's': {
-			vec dir = camera.dir;
-			vsmul(dir, -MOVE_STEP, dir);
-			vadd(camera.orig, camera.orig, dir);
-			vadd(camera.target, camera.target, dir);
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case 'r':
-			camera.orig.y += MOVE_STEP;
-			camera.target.y += MOVE_STEP;
-			reInitViewpointDependentBuffers(0);
-			break;
-		case 'f':
-			camera.orig.y -= MOVE_STEP;
-			camera.target.y -= MOVE_STEP;
-			reInitViewpointDependentBuffers(0);
 			break;
 //		case '+':
 //			currentSphere = (currentSphere + 1) % sphereCount;
@@ -505,62 +538,51 @@ void keyboard(unsigned char key, int x, int y) {
 		default:
 			break;
 	}
+	keyStates[key] = true;
 }
 
-void specialKeyboard(int key, int x, int y) {
-	switch (key) {
-		case GLUT_KEY_UP: {
-			vec t = camera.target;
-			vsub(t, t, camera.orig);
-			t.y = t.y * cos(-ROTATE_STEP) + t.z * sin(-ROTATE_STEP);
-			t.z = -t.y * sin(-ROTATE_STEP) + t.z * cos(-ROTATE_STEP);
-			vadd(t, t, camera.orig);
-			camera.target = t;
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case GLUT_KEY_DOWN: {
-			vec t = camera.target;
-			vsub(t, t, camera.orig);
-			t.y = t.y * cos(ROTATE_STEP) + t.z * sin(ROTATE_STEP);
-			t.z = -t.y * sin(ROTATE_STEP) + t.z * cos(ROTATE_STEP);
-			vadd(t, t, camera.orig);
-			camera.target = t;
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case GLUT_KEY_LEFT: {
-			vec t = camera.target;
-			vsub(t, t, camera.orig);
-			t.x = t.x * cos(-ROTATE_STEP) - t.z * sin(-ROTATE_STEP);
-			t.z = t.x * sin(-ROTATE_STEP) + t.z * cos(-ROTATE_STEP);
-			vadd(t, t, camera.orig);
-			camera.target = t;
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case GLUT_KEY_RIGHT: {
-			vec t = camera.target;
-			vsub(t, t, camera.orig);
-			t.x = t.x * cos(ROTATE_STEP) - t.z * sin(ROTATE_STEP);
-			t.z = t.x * sin(ROTATE_STEP) + t.z * cos(ROTATE_STEP);
-			vadd(t, t, camera.orig);
-			camera.target = t;
-			reInitViewpointDependentBuffers(0);
-			break;
-		}
-		case GLUT_KEY_PAGE_UP:
-			camera.target.y += MOVE_STEP;
-			reInitViewpointDependentBuffers(0);
-			break;
-		case GLUT_KEY_PAGE_DOWN:
-			camera.target.y -= MOVE_STEP;
-			reInitViewpointDependentBuffers(0);
-			break;
-		default:
-			break;
-	}
+/// simply records the key that was released
+void keyboardUp(unsigned char key, int x, int y) {
+    keyStates[key] = false;
 }
+
+
+/// gets the current mouse position and compares to the last one to check if
+/// we need to change the pitch/yaw of the camera
+/// it only changes the camera if the mouse button is pressed
+void motion(int x, int y) {
+	int deltaX = mouseX - x;
+	int deltaY = mouseY - y;
+
+	if (deltaX != 0 || deltaY != 0) {
+
+        // rotate the camera using pitch (nodding movement) and yaw (nonono movement)
+		if (mouseButton== GLUT_LEFT_BUTTON) {
+			camera.yaw += deltaX * 0.01;
+			camera.yaw = camera.yaw - TWO_PI * floor(camera.yaw / TWO_PI);
+			camera.pitch += -deltaY * 0.01;
+			camera.pitch = clamp(camera.pitch, -PI_OVER_TWO, PI_OVER_TWO);
+		}
+
+		glutSetCursor(GLUT_CURSOR_CROSSHAIR);
+
+		mouseX = x;
+		mouseY = y;
+		reInitViewpointDependentBuffers(0);
+	} else {
+        glutSetCursor(GLUT_CURSOR_INHERIT);
+    }
+}
+
+/// simply records the mouse state
+void mouse(int button, int state, int x, int y) {
+	mouseButton = button;
+	mouseX = x;
+	mouseY = y;
+
+	motion(x, y);
+}
+
 
 ///
 /// Initializes glut and opengl to sensible defaults.
@@ -577,10 +599,16 @@ void initGlut(int argc, char *argv[], char *windowTittle) {
     printf("About to create window...\n");
 	glutCreateWindow(windowTittle);
 
+	for (int i = 0; i < 256; i++) {
+        keyStates[i] = false;
+	}
+
     printf("About to register callbacks...\n");
     glutReshapeFunc(reshape);
+    glutMouseFunc(mouse);
+    glutMotionFunc(motion);
     glutKeyboardFunc(keyboard);
-    glutSpecialFunc(specialKeyboard);
+    glutKeyboardUpFunc(keyboardUp);
     glutDisplayFunc(displayScene);
 	glutIdleFunc(update);
 

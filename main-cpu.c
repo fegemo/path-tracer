@@ -111,7 +111,7 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 		allocateBuffers();
 	}
 
-	updateCamera();
+	updateCamera(&camera);
 	currentSample = 0;
 	updateRendering();
 }
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
 	}
     const int numberOfObjects = readScene(sceneName);
 
-	updateCamera();
+	updateCamera(&camera);
 
 	printf("About to allocate opencl buffers...\n");
 	allocateBuffers();

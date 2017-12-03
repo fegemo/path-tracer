@@ -32,7 +32,7 @@ static char *kernelFileName = "rendering_kernel.cl";
 static vec *colors;
 static unsigned int *seeds;
 Camera camera;
-static int currentSample = 0;
+int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
 int *debug;
@@ -876,8 +876,8 @@ void updateRendering() {
 		fprintf(stderr, "Failed to read the OpenCL debug buffer: %d\n", status);
 		exit(-1);
 	} else {
-	    printf("sizeof(Object) [CPU]: %d\n", sizeof(Object));
-        printf("sizeof(Object) [GPU]: %d\n", debug[0]);
+//	    printf("sizeof(Object) [CPU]: %d\n", sizeof(Object));
+//        printf("sizeof(Object) [GPU]: %d\n", debug[0]);
 	}
 
 
@@ -921,10 +921,10 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
     // when ' ' is pressed we want to throw away all our buffers and realloc them
 	if (reallocBuffers) {
 		freeBuffers();
-		updateCamera();
+		updateCameraBasis(&camera);
 		allocateOutputBuffers();
 	} else {
-		updateCamera();
+		updateCameraBasis(&camera);
 	}
 
 	// writes the camera buffer back to vram, as we've just changed it on the ram
@@ -974,7 +974,7 @@ int main(int argc, char *argv[]) {
     }
     const int numberOfObjects = readScene(sceneName);
 
-	updateCamera();
+	updateCameraBasis(&camera);
 
     setenv("CUDA_CACHE_DISABLE", "1", 1);
 	setUpOpenCL();

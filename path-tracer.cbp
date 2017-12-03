@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 path-tracing.cl 640 480 scenes/large-object.txt" />
+				<Option parameters="1 0 path-tracing.cl 640 480 scenes/simple-spheres.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -49,6 +49,9 @@
 			<Add before="cpp &lt; ray-tracing.cl &gt;preprocessed_ray_tracing.cl" />
 		</ExtraCommands>
 		<Unit filename="Makefile" />
+		<Unit filename="camera.c">
+			<Option compilerVar="CC" />
+		</Unit>
 		<Unit filename="camera.h" />
 		<Unit filename="displayfunc.c">
 			<Option compilerVar="CC" />

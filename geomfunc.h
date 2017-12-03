@@ -335,6 +335,7 @@ static void RadiancePathTracing(
 			*result = rad;
 			// if the ray missed, return just the color so far...
 			// we could put a skybox here...
+
 			return;
 		}
 
@@ -370,16 +371,16 @@ static void RadiancePathTracing(
 		vsmul(nl, invSignDP, normal);
 
 		// adds the light emitted by the object hit
-		vec eCol; vassign(eCol, obj->emission);
+		vec emittedColor; vassign(emittedColor, obj->emission);
 		// if the object does emit light....
-		if (!viszero(eCol)) {
+		if (!viszero(emittedColor)) {
 			// and if this is a bounce originated from specular materials...
 			if (specularBounce) {
 				// reduce the emitted color according to the ray hitting angle and normal, then by this throughput,
 				// then adds it to the output radiance
-				vsmul(eCol, fabs(dp), eCol);
-				vmul(eCol, throughput, eCol);
-				vadd(rad, rad, eCol);
+				vsmul(emittedColor, fabs(dp), emittedColor);
+				vmul(emittedColor, throughput, emittedColor);
+				vadd(rad, rad, emittedColor);
 			}
 
 			// light emitting objects do not bounce the ray, so we return
