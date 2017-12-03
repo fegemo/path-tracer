@@ -10,6 +10,7 @@
 #include "geom.h"
 #include "simplernd.h"
 #include "displayfunc.h"
+#include "time-utils.h"
 
 /* Options */
 static int useGPU = 1;
@@ -27,7 +28,8 @@ static cl_command_queue commandQueue;
 static cl_program program;
 static cl_kernel kernel;
 static unsigned int workGroupSize = 1;
-static char *kernelFileName = "rendering_kernel.cl";
+static char *kernelFileName = "path-tracing.cl";
+double startRenderingTime;
 
 static vec *colors;
 static unsigned int *seeds;
@@ -36,6 +38,13 @@ int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
 int *debug;
+
+
+extern char captionLine1[];
+extern char captionLine2[];
+
+
+void updateRenderingStatistics(double, int);
 
 ///
 /// Frees the color, pixel and random seeds buffer from vram and ram.
@@ -483,7 +492,7 @@ static void setUpOpenCL() {
 	commandQueue = clCreateCommandQueue(
 			context,
 			devices[0],
-			(unsigned int)NULL,
+			(cl_command_queue_properties)NULL,
 			&status);
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to create OpenCL command queue: %d\n", status);
@@ -703,7 +712,7 @@ static void executeKernel() {
 /// updated color buffer.
 ///
 void updateRendering() {
-	double startTime = wallClockTime();
+	double frameStartTime = wallClockTime();
 	int startSampleCount = currentSample;
 
     // sets the arguments for the kernel (the color buffer)
@@ -836,7 +845,7 @@ void updateRendering() {
 			currentSample++;
 
 			// keeps executing the kernel for more samples for at most 500ms, then proceed
-			const float elapsedTime = wallClockTime() - startTime;
+			const float elapsedTime = wallClockTime() - frameStartTime;
 			if (elapsedTime > tresholdTime)
 				break;
 		}
@@ -876,19 +885,31 @@ void updateRendering() {
 		fprintf(stderr, "Failed to read the OpenCL debug buffer: %d\n", status);
 		exit(-1);
 	} else {
-//	    printf("sizeof(Object) [CPU]: %d\n", sizeof(Object));
-//        printf("sizeof(Object) [GPU]: %d\n", debug[0]);
+	    // here we can show any debug info from the kernel... eg, those from the debugBuffer
+        //printf("sizeof(Object) [CPU]: %d\n", sizeof(Object));
+        //printf("sizeof(Object) [GPU]: %d\n", debug[0]);
 	}
 
 
-	/*------------------------------------------------------------------------*/
+	updateRenderingStatistics(frameStartTime, startSampleCount);
+}
 
+/// Calculates the current rendering statistics: ellapsed time (beginning and this frame),
+/// total passes, samples per second
+///
+/// Rendering time: total (this frame)
+/// Passes: total (per second)
+void updateRenderingStatistics(double frameStartTime, int startSampleCount) {
 	// time spent on this "glut frame"... updates the string samples/sec to render it
-	const double elapsedTime = wallClockTime() - startTime;
+	const double elapsedTimeThisFrame = wallClockTime() - frameStartTime;
+	const double elapsedTime = wallClockTime() - startRenderingTime;
+	char timeSinceBeginning[30];
+	getHumanReadableTime(elapsedTime, timeSinceBeginning);
+	sprintf(captionLine1, "Rendering time: %s (%.3fs since last update)", timeSinceBeginning, elapsedTimeThisFrame);
+
 	const int samples = currentSample - startSampleCount;
-	const double sampleSec = samples * height * width / elapsedTime;
-	sprintf(captionBuffer, "Rendering time %.3f sec (pass %d)  Sample/sec  %.1fK\n",
-			elapsedTime, currentSample, sampleSec / 1000.f);
+	const double sampleSec = samples * height * width / elapsedTimeThisFrame;
+	sprintf(captionLine2, "Passes: %d  (%.1fK samples/s)", currentSample, sampleSec / 1000.f);
 }
 
 ///
@@ -944,6 +965,7 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 	}
 
 	currentSample = 0;
+	startRenderingTime = wallClockTime();
 }
 
 ///

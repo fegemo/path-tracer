@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <sys/time.h>
 #include <stdbool.h>
 #include <libgen.h>
 
 #include "camera.h"
 #include "geom.h"
 #include "displayfunc.h"
+#include "time-utils.h"
+
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "tinyobj_loader_c.h"
 
@@ -20,31 +21,25 @@ extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
 extern int currentSample;
+extern double startRenderingTime;
 
 char sceneTitle[100];
 int width = 640;
 int height = 480;
 unsigned int *pixels;
-char captionBuffer[256];
+char captionLine1[256];
+char captionLine2[256];
 
 
 // interaction with the camera
 int mouseX = 0, mouseY = 0;
 int mouseButton = 0;
 bool keyStates[256];
-const float MOVE_STEP = 10.0f;
-const float ROTATE_STEP = (2.f * FLOAT_PI / 180.f);
-
+bool shiftPressed = false;
+Camera originalCamera;
 
 int timeBefore = 0;
 int startUpTime;
-
-double wallClockTime() {
-	struct timeval t;
-	gettimeofday(&t, NULL);
-
-	return t.tv_sec + t.tv_usec / 1000000.0;
-}
 
 static const char* readFile(size_t* fileLength, const char* fileName) {
     char *contents;
@@ -71,7 +66,7 @@ static void renderString(void *font, const char *string) {
 	}
 }
 
-
+/// Removes the extension of a file name
 void stripExtension(char *fileName)
 {
     char *end = fileName + strlen(fileName);
@@ -109,6 +104,7 @@ int readScene(char *fileName) {
 	camera.width = width;
 	camera.height = height;
 
+	originalCamera = camera;
 	if (c != 6) {
 		fprintf(stderr, "Failed to read 6 camera parameters: %d\n", c);
 		exit(-1);
@@ -363,7 +359,7 @@ int readScene(char *fileName) {
 
 void updateCamera(int delta) {
     bool cameraMoved = false;
-    float speed =  delta * 0.0001f;
+    float speed =  delta * 0.0001f * (shiftPressed ? 10 : 1);
     vec movement = {0.f, 0.f, 0.f};
 
     // forward or backward movement
@@ -395,7 +391,6 @@ void updateCamera(int delta) {
         vadd(camera.orig, camera.orig, movement);
         vadd(camera.target, camera.target, movement);
 
-        updateCameraBasis(&camera);
         reInitViewpointDependentBuffers(0);
     }
 }
@@ -423,14 +418,12 @@ void displayScene(void) {
 	glRasterPos2i(0, 0);
 	glDrawPixels(width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
 
-	// renders the title at the top
-	glColor3f(1.f, 1.f, 1.f);
-	glRasterPos2i(4, height - 16);
-
 	// renders the stats at the bottom
 	glColor3f(1.f, 1.f, 1.f);
+	glRasterPos2i(4, 23);
+	renderString(GLUT_BITMAP_8_BY_13, captionLine1);
 	glRasterPos2i(4, 10);
-	renderString(GLUT_BITMAP_HELVETICA_18, captionBuffer);
+	renderString(GLUT_BITMAP_8_BY_13, captionLine2);
 
 	glutSwapBuffers();
 }
@@ -452,31 +445,13 @@ void reshape(int newWidth, int newHeight) {
 }
 
 
-/// returns (on the time param) a human readable string for a certain
-/// number of millisseconds, eg, 15ms, 56s, 1m, 24h
-/// numbers are always integers, rounded up or down
-void getHumanReadableTime(int millis, char *time) {
-    if (millis < 1000) {
-        // less than 1s: show in ms
-        sprintf(time, "%ims", millis);
-    } else if (millis < 1000 * 60) {
-        // less than 1min: show in s
-        sprintf(time, "%.0fs", roundf(millis / 1000.f));
-    } else if (millis < 1000 * 60 * 60) {
-        // less than 1h: show in m
-        sprintf(time, "%.0fm", roundf(millis / 1000.f / 60.f));
-    } else {
-        // 1h or more: show in h
-        sprintf(time, "%.0fh", roundf(millis / 1000.f / 60.f / 60.f));
-    }
-}
-
 void keyboard(unsigned char key, int x, int y) {
 	switch (key) {
+	    case 'P':
 		case 'p': {
 		    char fileName[200];
 		    char timeSinceBeginning[20];
-		    getHumanReadableTime(glutGet(GLUT_ELAPSED_TIME), timeSinceBeginning);
+		    getHumanReadableTime(wallClockTime() - startRenderingTime, timeSinceBeginning);
 		    sprintf(fileName, "%s-%i-%s.ppm", sceneTitle, currentSample, timeSinceBeginning);
 			FILE *f = fopen(fileName, "w"); // Write image to PPM file.
 			if (!f) {
@@ -495,6 +470,12 @@ void keyboard(unsigned char key, int x, int y) {
 			}
 			break;
 		}
+		case ' ':
+            // resets the camera to its initial position
+            camera = originalCamera;
+            reInitViewpointDependentBuffers(0);
+            break;
+
 		case 27: // ESC
 			fprintf(stderr, "Done.\n");
 			exit(0);
@@ -583,6 +564,17 @@ void mouse(int button, int state, int x, int y) {
 	motion(x, y);
 }
 
+void special(int key, int x, int y) {
+    if (key == GLUT_KEY_SHIFT_L || key == GLUT_KEY_SHIFT_R) {
+        shiftPressed = true;
+    }
+}
+
+void specialUp(int key, int x, int y) {
+    if (key == GLUT_KEY_SHIFT_L || key == GLUT_KEY_SHIFT_R) {
+        shiftPressed = false;
+    }
+}
 
 ///
 /// Initializes glut and opengl to sensible defaults.
@@ -609,6 +601,8 @@ void initGlut(int argc, char *argv[], char *windowTittle) {
     glutMotionFunc(motion);
     glutKeyboardFunc(keyboard);
     glutKeyboardUpFunc(keyboardUp);
+    glutSpecialFunc(special);
+    glutSpecialUpFunc(specialUp);
     glutDisplayFunc(displayScene);
 	glutIdleFunc(update);
 
