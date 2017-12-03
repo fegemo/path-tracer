@@ -905,7 +905,7 @@ void updateRenderingStatistics(double frameStartTime, int startSampleCount) {
 	const double elapsedTime = wallClockTime() - startRenderingTime;
 	char timeSinceBeginning[30];
 	getHumanReadableTime(elapsedTime, timeSinceBeginning);
-	sprintf(captionLine1, "Rendering time: %s (%.3fs since last update)", timeSinceBeginning, elapsedTimeThisFrame);
+	sprintf(captionLine1, "Time:   %s  (%.3fs frames/s)", timeSinceBeginning, elapsedTimeThisFrame);
 
 	const int samples = currentSample - startSampleCount;
 	const double sampleSec = samples * height * width / elapsedTimeThisFrame;

@@ -32,14 +32,12 @@ char captionLine2[256];
 
 
 // interaction with the camera
-int mouseX = 0, mouseY = 0;
-int mouseButton = 0;
-bool keyStates[256];
-bool shiftPressed = false;
-Camera originalCamera;
-
-int timeBefore = 0;
-int startUpTime;
+static int mouseX = 0, mouseY = 0;
+static int mouseButton = 0;
+static bool keyStates[256];
+static bool shiftPressed = false;
+static Camera originalCamera;
+static int timeBefore = 0;
 
 static const char* readFile(size_t* fileLength, const char* fileName) {
     char *contents;

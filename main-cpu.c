@@ -15,9 +15,16 @@ int workGroupSize = 1;
 static vec *colors;
 static unsigned int *seeds;
 Camera camera;
-static int currentSample = 0;
+int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
+double startRenderingTime;
+
+extern char captionLine1[];
+extern char captionLine2[];
+
+void updateRenderingStatistics(double);
+
 
 void freeBuffers() {
 	free(seeds);
@@ -41,7 +48,7 @@ void allocateBuffers() {
 }
 
 void updateRendering(void) {
-	double startTime = wallClockTime();
+	double frameStartTime = wallClockTime();
 
 	const float invWidth = 1.f / width;
 	const float invHeight = 1.f / height;
@@ -92,13 +99,28 @@ void updateRendering(void) {
 		}
 	}
 
-	const float elapsedTime = wallClockTime() - startTime;
-	const float sampleSec = height * width / elapsedTime;
-	sprintf(captionBuffer, "Rendering time %.3f sec (pass %d)  Sample/sec  %.1fK\n",
-		elapsedTime, currentSample, sampleSec / 1000.f);
+	updateRenderingStatistics(frameStartTime);
 
 	currentSample++;
 }
+
+/// Calculates the current rendering statistics: ellapsed time (beginning and this frame),
+/// total passes, samples per second
+///
+/// Rendering time: total (this frame)
+/// Passes: total (per second)
+void updateRenderingStatistics(double frameStartTime) {
+	// time spent on this "glut frame"... updates the string samples/sec to render it
+	const double elapsedTimeThisFrame = wallClockTime() - frameStartTime;
+	const double elapsedTime = wallClockTime() - startRenderingTime;
+	char timeSinceBeginning[30];
+	getHumanReadableTime(elapsedTime, timeSinceBeginning);
+	sprintf(captionLine1, "Time:   %s  (%.3fs frames/s)", timeSinceBeginning, elapsedTimeThisFrame);
+
+	const double sampleSec = height * width / elapsedTimeThisFrame;
+	sprintf(captionLine2, "Passes: %d  (%.1fK samples/s)", currentSample, sampleSec / 1000.f);
+}
+
 
 void reInitSceneObjects() {
 	currentSample = 0;
@@ -111,8 +133,9 @@ void reInitViewpointDependentBuffers(const int reallocBuffers) {
 		allocateBuffers();
 	}
 
-	updateCamera(&camera);
+	updateCameraBasis(&camera);
 	currentSample = 0;
+	startRenderingTime = wallClockTime();
 	updateRendering();
 }
 
@@ -134,7 +157,7 @@ int main(int argc, char *argv[]) {
 	}
     const int numberOfObjects = readScene(sceneName);
 
-	updateCamera(&camera);
+	updateCameraBasis(&camera);
 
 	printf("About to allocate opencl buffers...\n");
 	allocateBuffers();
