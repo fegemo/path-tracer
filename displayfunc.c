@@ -478,6 +478,27 @@ void keyboard(unsigned char key, int x, int y) {
 			fprintf(stderr, "Done.\n");
 			exit(0);
 			break;
+
+        case 'w':
+        case 'W':
+            setKeyStates('w', 'W', true);
+            break;
+
+        case 's':
+        case 'S':
+            setKeyStates('s', 'S', true);
+            break;
+
+        case 'a':
+        case 'A':
+            setKeyStates('a', 'A', true);
+            break;
+
+        case 'd':
+        case 'D':
+            setKeyStates('d', 'D', true);
+            break;
+
 //		case '+':
 //			currentSphere = (currentSphere + 1) % sphereCount;
 //			fprintf(stderr, "Selected sphere %d (%f %f %f)\n", currentSphere,
@@ -520,9 +541,34 @@ void keyboard(unsigned char key, int x, int y) {
 	keyStates[key] = true;
 }
 
+inline void setKeyStates(unsigned char lowercase, unsigned char uppercase, bool value) {
+    keyStates[lowercase] = value;
+    keyStates[uppercase] = value;
+}
+
 /// simply records the key that was released
 void keyboardUp(unsigned char key, int x, int y) {
-    keyStates[key] = false;
+    switch (key) {
+    case 'w':
+    case 'W':
+        setKeyStates('w', 'W', false);
+        break;
+
+    case 's':
+    case 'S':
+        setKeyStates('s', 'S', false);
+        break;
+
+    case 'a':
+    case 'A':
+        setKeyStates('a', 'A', false);
+        break;
+
+    case 'd':
+    case 'D':
+        setKeyStates('d', 'D', false);
+        break;
+    }
 }
 
 

@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 path-tracing.cl 640 480 scenes/simple-spheres.txt" />
+				<Option parameters="1 0 path-tracing.cl 640 480 scenes/cornell-original.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -28,7 +28,7 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Option use_console_runner="0" />
-				<Option parameters="480 320 scenes/large-object.txt" />
+				<Option parameters="480 320 scenes/cornell-original.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -37,6 +37,7 @@
 		</Build>
 		<Compiler>
 			<Add option="-Wall" />
+			<Add option="-std=c99" />
 			<Add option="-msse2 -mfpmath=sse -ftree-vectorize -funroll-loops" />
 		</Compiler>
 		<Linker>
@@ -102,6 +103,10 @@
 		<Unit filename="scenes/simple.txt" />
 		<Unit filename="scenes/table-and-mirror.txt" />
 		<Unit filename="simplernd.h" />
+		<Unit filename="time-utils.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="time-utils.h" />
 		<Unit filename="tinyobj_loader_c.h" />
 		<Unit filename="vec.h" />
 		<Extensions>
