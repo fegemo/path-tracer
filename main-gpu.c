@@ -706,6 +706,13 @@ static void executeKernel() {
 	}
 }
 
+#define SET_KERNEL_ARG(kernel, i, type, value) do {\
+        cl_int status = clSetKernelArg(kernel, i, sizeof(type), (void*)(value));\
+        if (status != CL_SUCCESS) {\
+            fprintf(stderr, "Failed to set OpenCL arg. #%d: %d\n", (i+1), status);\
+        }\
+    } while(0)
+
 ///
 /// Asks the device to draw as many times as it can in 500ms by calling executeKernel() with the
 /// updated values. Then, updates the color (output) buffer from vram to ram so glut redraws an
@@ -718,114 +725,34 @@ void updateRendering() {
     // sets the arguments for the kernel (the color buffer)
     // kernel (id), arg_index (index of this argument in the kernel function),
     //      arg_size (bytes of this argument), arg_value
-	cl_int status = clSetKernelArg(
-			kernel,
-			0,
-			sizeof(cl_mem),
-			(void *)&colorBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #1: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 0, cl_mem, &colorBuffer);
 
 	// now, sets the value for the random seed buffer
-	status = clSetKernelArg(
-			kernel,
-			1,
-			sizeof(cl_mem),
-			(void *)&seedBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #2: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 1, cl_mem, &seedBuffer);
 
 	// now, for the objects buffer
-	status = clSetKernelArg(
-			kernel,
-			2,
-			sizeof(cl_mem),
-			(void *)&objectBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #3: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 2, cl_mem, &objectBuffer);
 
 	// and the camera buffer
-	status = clSetKernelArg(
-			kernel,
-			3,
-			sizeof(cl_mem),
-			(void *)&cameraBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #4: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 3, cl_mem, &cameraBuffer);
 
 	// and the objects count
-	status = clSetKernelArg(
-			kernel,
-			4,
-			sizeof(unsigned int),
-			(void *)&objectCount);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #5: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 4, unsigned int, &objectCount);
 
 	// and the scene width
-	status = clSetKernelArg(
-			kernel,
-			5,
-			sizeof(int),
-			(void *)&width);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #6: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 5, int, &width);
 
 	// and height
-	status = clSetKernelArg(
-			kernel,
-			6,
-			sizeof(int),
-			(void *)&height);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #7: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 6, int, &height);
 
 	// sets the value of the currentSample (what is this) in the kernel
-	status = clSetKernelArg(
-			kernel,
-			7,
-			sizeof(int),
-			(void *)&currentSample);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #8: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 7, int, &currentSample);
 
 	// sets the value of the pixel buffer (what is being drawn by opengl, gamma-corrected and in 4 bytes)
-	status = clSetKernelArg(
-			kernel,
-			8,
-			sizeof(cl_mem),
-			(void *)&pixelBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #9: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 8, cl_mem, &pixelBuffer);
 
 	// sets the value of the debug buffer (to debug the Object struct alignment/packing)
-	status = clSetKernelArg(
-			kernel,
-			9,
-			sizeof(cl_mem),
-			(void *)&debugBuffer);
-	if (status != CL_SUCCESS) {
-		fprintf(stderr, "Failed to set OpenCL arg. #10: %d\n", status);
-		exit(-1);
-	}
+    SET_KERNEL_ARG(kernel, 9, cl_mem, &debugBuffer);
 
 
 	// asks the device to execute the kernel
@@ -850,6 +777,8 @@ void updateRendering() {
 				break;
 		}
 	}
+
+	cl_int status;
 
 	// now that we have executed the kernel as many times as we could on 500ms, we want to read
 	// the results back from the opencl program (vram -> ram)
