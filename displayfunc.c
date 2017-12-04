@@ -193,11 +193,11 @@ void readScene(char *fileName) {
 
 
             // sets a center of the triangle (in case it's a light source) and its radius
-            vclr(tri->center)
-            vadd(tri->center, tri->p1, tri->center);
-            vadd(tri->center, tri->p2, tri->center);
-            vadd(tri->center, tri->p3, tri->center);
-            vsmul(tri->center, 1/3.0f, tri->center);
+//            vclr(tri->center)
+//            vadd(tri->center, tri->p1, tri->center);
+//            vadd(tri->center, tri->p2, tri->center);
+//            vadd(tri->center, tri->p3, tri->center);
+//            vsmul(tri->center, 1/3.0f, tri->center);
 
             // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
             // the area of the circle outside the triangle is (abc)/4area
@@ -209,7 +209,7 @@ void readScene(char *fileName) {
             vec e2; vsub(e2, tri->p3, tri->p1);
             vec normal; vxcross(normal, e1, e2);
             tri->area = norm(normal) * 0.5f;
-            tri->radius = (a*b*c)/(4*tri->area);
+//            tri->radius = (a*b*c)/(4*tri->area);
             vnorm(normal);
 
             printf("tri #%d normal: %.2f %.2f %.2f\n", lineIndex + addedObjects, normal.x, normal.y, normal.z);
@@ -312,11 +312,11 @@ void readScene(char *fileName) {
                 tri->p3 = p3;
 
                 // sets a center of the triangle (in case it's a light source) and its radius
-                vclr(tri->center)
-                vadd(tri->center, p1, tri->center);
-                vadd(tri->center, p2, tri->center);
-                vadd(tri->center, p3, tri->center);
-                vsmul(tri->center, 1/3.0f, tri->center);
+//                vclr(tri->center)
+//                vadd(tri->center, p1, tri->center);
+//                vadd(tri->center, p2, tri->center);
+//                vadd(tri->center, p3, tri->center);
+//                vsmul(tri->center, 1/3.0f, tri->center);
 
                 // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
                 // the area of the circle outside the triangle is (abc)/4area
@@ -328,7 +328,7 @@ void readScene(char *fileName) {
                 vec e2; vsub(e2, tri->p3, tri->p1);
                 vec normal; vxcross(normal, e1, e2);
                 tri->area = norm(normal) * 0.5f;
-                tri->radius = (a*b*c)/(4*tri->area);
+//                tri->radius = (a*b*c)/(4*tri->area);
 
 
                 if (!viszero(tri->emission)) {

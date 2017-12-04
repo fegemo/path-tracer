@@ -254,7 +254,6 @@ static void SampleLights(
             case SPHERE:
             default:
                 {
-
                     vec unitSpherePoint;
                     UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
                     vsmul(lightPoint, light->radius, unitSpherePoint);
@@ -292,7 +291,6 @@ static void SampleLights(
                 //
 				vec lightColor; vassign(lightColor, light->emission);
                 //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
-//				const float s = 4 * FLOAT_PI * light->radius * light->radius * wi * wo / (len *len);
 				const float s = light->area * wi * wo / (len *len);
 				vsmul(lightColor, s, lightColor);
 
@@ -301,7 +299,125 @@ static void SampleLights(
 			}
 		}
 	}
+	// if I take the average of the lights contributions the scene gets too dark...
+	// although that's how pbrt does it...
+    //vsmul(*result, 1.f/lightCount, *result);
 }
+
+///
+/// randomly chooses one light in the scene to get how much it directly contributes to
+/// the point (hitPoint) from a surface with a (normal) and output to (result)
+///
+//static void UniformSampleOneLight(
+//	// the scene
+//	OCL_GLOBAL_BUFFER const Object *objects,
+//	// the size of the scene
+//	const unsigned int objectCount,
+//	const unsigned int lightCount,
+//	// random seeds
+//	unsigned int *seed0, unsigned int *seed1,
+//	// the point we're calculating the direct contribution from light
+//	const vec *hitPoint,
+//	// the normal on that point
+//	const vec *normal,
+//	// the returning direct lighting contribution
+//	vec *result) {
+//
+//	// result = (0,0,0)
+//	vclr(*result);
+//
+//	// chooses one light
+//	unsigned int lightIndex = (int)floor(GetRandom(seed0, seed1) * lightCount);
+//	// for each light...
+//	unsigned int i;
+//	unsigned int lightsVisited;
+//	for (i = 0, lightsVisited = 0; i < objectCount && lightsVisited < lightCount; i++) {
+//		OCL_GLOBAL_BUFFER const Object *light = &objects[i];
+//		if (light->type == MODEL) continue;
+//		if (viszero(light->emission)) continue;
+//        if (lightsVisited++ != lightIndex) continue;
+//
+//        // the shadow ray starts at the hitPoint and goes to a random point on the light
+//        Ray shadowRay;
+//        shadowRay.o = *hitPoint;
+//
+//        // choose a random point over the area of the light source
+//        vec lightPoint;
+//        vec lightNormalWhereShadowRayHit;
+//        switch (light->type) {
+//        case TRIANGLE:
+//            {
+//                float barycentricU, barycentricV;
+//                vec e1, e2;
+//                UniformSampleTriangle(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &barycentricU, &barycentricV);
+//                vsub(e1, light->p2, light->p1)
+//                vsub(e2, light->p3, light->p1)
+//                vsmul(e1, barycentricU, e1);
+//                vsmul(e2, barycentricV, e2);
+//                vassign(lightPoint, light->p1);
+//                vadd(lightPoint, lightPoint, e1);
+//                vadd(lightPoint, lightPoint, e2);
+//
+//                // sets what is the normal on the triangle where the shadow ray hit it
+//                // (it's the same regardless of the point because it's a triangle)
+//                vxcross(lightNormalWhereShadowRayHit, e1, e2);
+//                vnorm(lightNormalWhereShadowRayHit);
+//            }
+//            break;
+//
+//        case SPHERE:
+//        default:
+//            {
+//
+//                vec unitSpherePoint;
+//                UniformSampleSphere(GetRandom(seed0, seed1), GetRandom(seed0, seed1), &unitSpherePoint);
+//                vsmul(lightPoint, light->radius, unitSpherePoint);
+//                vadd(lightPoint, lightPoint, light->center);
+//
+//                // sets what is the normal on the triangle where the shadow ray hit it
+//                vassign(lightNormalWhereShadowRayHit, unitSpherePoint);
+//            }
+//        }
+//
+//        // configures the direction of the shadow ray, finds its length (keep it on len)
+//        // and then normalizes the direction vector
+//        vsub(shadowRay.d, lightPoint, *hitPoint);
+//        const float len = sqrt(vdot(shadowRay.d, shadowRay.d));
+//        vsmul(shadowRay.d, 1.f / len, shadowRay.d);
+//
+//        // finds the angle between shadow and the light normal
+//        // if it is accute (ie, dot > 0, we hit the backside of the light
+//        float wo = vdot(shadowRay.d, lightNormalWhereShadowRayHit);
+//        if (wo > 0.f) {
+//            // we hit the other half of the light... should ignore it
+//            continue;
+//        } else {
+//            // we just flip the sign of the cosine because we want it positive
+//            //   ...basically because we want the vector to be from the light sphere surface to its center
+//            wo = -wo;
+//        }
+//        wo = clamp(wo, 0.f, 1.f);
+//
+//        // now we send the shadow ray to the light and see if it hits another object before it...
+//        //   wi > 0 <=> the light is in the outside and in the direction of the hitPoint normal
+//        const float wi = vdot(shadowRay.d, *normal);
+//        if ((wi > 0.f) && (!IntersectP(objects, objectCount, &shadowRay, len - EPSILON))) {
+//            // the object faces the light (wi > 0) and the shadow ray doesnt intersect anything
+//            //
+//            vec lightColor; vassign(lightColor, light->emission);
+//            //  s = 4PIr² * cos(shadowR and light incidence) * cos(shadowR and normal) / d²
+//            const float s = light->area * wi * wo / (len *len);
+//            vsmul(lightColor, s, lightColor);
+//
+//            // last, we add the direct contribution of this light to the output Ld radiance
+//            vadd(*result, *result, lightColor);
+//        }
+//
+//        // exits the for, as we only wanted to sample from 01 light and we did it
+//        vsmul(*result, lightCount, *result);
+//        break;
+//	}
+//}
 
 
 static void RadiancePathTracing(
@@ -404,6 +520,7 @@ static void RadiancePathTracing(
 
 			vec Ld;
 			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			//UniformSampleOneLight(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
 

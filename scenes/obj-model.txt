@@ -1,18 +1,19 @@
 camera 0 45 205.6  0 44.957388 204.6
-size 13
+size 10
 model models/plane-x.obj  90 69 0   -1 70 60  0 0 0  0.25 .25 0.75  0
 model models/plane-x.obj -89 69 0    1 70 60  0 0 0  0.75 .25 0.25  0
 model models/plane-y.obj  0  0 0    100 -1 100  0 0 0  0.75 .75 0.75  0
-model models/cube.obj  0 10 0  16 16 16  0 0 0  0.4 0.7 0.1  0
+model models/cube.obj  0 10 0  16 16 16  0 0 0  0.4 0.7 0.1  1
 model models/plane-y.obj  0 100 0   100 1 100  0 0 0  0.75 .75 0.75  0
 model models/plane-z.obj  0 70 -60   100 75 1  0 0 0  0.75 .75 0.75  0
 model models/table.obj  27 6 47  16 16 16  0 0 0  0.5 0.2 0  0
-model models/teapot.obj 21 21 44  2.5 2.5 2.5  0 0 0  1 0.9 1  1
+model models/teapot.obj 21 21 44  2.5 2.5 2.5  0 0 0  1 0.9 1  0
+triangle  10 98 10  -10 98 -10  10 98 -10  20 20 20  0 0 0  0
+triangle  -10 98 10  -10 98 -10  10 98 10  20 20 20  0 0 0  0
+
 model models/d20.obj  27 24 47  2 2 2  0 0 0  0.7 0.7 0.4  2
 model models/d20.obj  31 24 44  2 2 2  0 0 0  0.3 0.7 0.6  1
 model models/d20.obj  23.5 24 47.5  2 2 2  0 0 0  0.7 0.2 0.7  0
-triangle  10 99 10  -10 99 -10  10 99 -10  8 8 8  0 0 0  0
-triangle  -10 99 10  -10 99 -10  10 99 10  8 8 8  0 0 0  0
 
 
 
