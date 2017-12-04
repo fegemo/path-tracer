@@ -18,6 +18,7 @@ Camera camera;
 int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
+unsigned int lightCount;
 double startRenderingTime;
 
 extern char captionLine1[];
@@ -77,9 +78,9 @@ void updateRendering(void) {
 			vnorm(rdir);
 			const Ray ray = {rorig, rdir};
 			vec radiance;
-			RadiancePathTracing(objects, objectCount, &ray,
+			RadiancePathTracing(objects, objectCount, lightCount, &ray,
 					&seeds[i2], &seeds[i2 + 1], &radiance);
-//			RadianceDirectLighting(objects, objectCount, &ray,
+//			RadianceDirectLighting(objects, objectCount, lightCount, &ray,
 //					&seeds[i2], &seeds[i2 + 1], &radiance);
 
 			if (currentSample == 0) {
@@ -155,7 +156,7 @@ int main(int argc, char *argv[]) {
 	} else {
 		exit(-1);
 	}
-    const int numberOfObjects = readScene(sceneName);
+    readScene(sceneName);
 
 	updateCameraBasis(&camera);
 
@@ -164,7 +165,7 @@ int main(int argc, char *argv[]) {
 
 	printf("About to init glut...\n");
 	char windowTitle[150];
-	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
+	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, objectCount);
 	initGlut(argc, argv, windowTitle);
 
 	printf("About to start the main loop...\n");

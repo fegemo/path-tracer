@@ -31,6 +31,7 @@ __kernel void radianceGPU(
     __global vec *colors, __global unsigned int *seedsInput,
 	__global Object *object, OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int objectCount,
+	const unsigned int lightCount,
 	const int width, const int height,
 	const int currentSample,
 	__global int *pixels,
@@ -52,7 +53,7 @@ __kernel void radianceGPU(
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
 	vec radiance;
-	RadianceDirectLighting(object, objectCount, &ray, &seed0, &seed1, &radiance);
+	RadianceDirectLighting(object, objectCount, lightCount, &ray, &seed0, &seed1, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {

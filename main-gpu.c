@@ -37,6 +37,7 @@ Camera camera;
 int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
+unsigned int lightCount;
 int *debug;
 
 
@@ -754,6 +755,9 @@ void updateRendering() {
 	// sets the value of the debug buffer (to debug the Object struct alignment/packing)
     SET_KERNEL_ARG(kernel, 9, cl_mem, &debugBuffer);
 
+    // sets the number of lights in the scene
+    SET_KERNEL_ARG(kernel, 10, unsigned int, &lightCount);
+
 
 	// asks the device to execute the kernel
 	if (currentSample < 20) {
@@ -923,7 +927,9 @@ int main(int argc, char *argv[]) {
 	} else {
 		exit(-1);
     }
-    const int numberOfObjects = readScene(sceneName);
+
+//    const int numberOfObjects = readScene(sceneName);
+    readScene(sceneName);
 
 	updateCameraBasis(&camera);
 
@@ -931,7 +937,7 @@ int main(int argc, char *argv[]) {
 	setUpOpenCL();
 
 	char windowTitle[150];
-	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, numberOfObjects);
+	sprintf(windowTitle, "FegemoPT: %s (%d objects)", sceneName, objectCount);
 	initGlut(argc, argv, windowTitle);
 
     glutMainLoop();

@@ -17,7 +17,7 @@ extern int amiSmallptCPU;
 extern void initGlut(int argc, char *argv[], char *windowTittle);
 extern double wallClockTime();
 
-extern int readScene(char *);
+extern void readScene(char *);
 extern void updateCamera();
 
 #endif	/* _DISPLAYFUNC_H */

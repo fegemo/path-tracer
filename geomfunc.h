@@ -200,6 +200,7 @@ static void SampleLights(
 	OCL_GLOBAL_BUFFER const Object *objects,
 	// the size of the scene
 	const unsigned int objectCount,
+	const unsigned int lightCount,
 	// random seeds
 	unsigned int *seed0, unsigned int *seed1,
 	// the point we're calculating the direct contribution from light
@@ -214,11 +215,14 @@ static void SampleLights(
 
 	// for each light...
 	unsigned int i;
-	for (i = 0; i < objectCount; i++) {
+	unsigned int lightsVisited;
+	for (i = 0, lightsVisited = 0; i < objectCount && lightsVisited < lightCount; i++) {
 		OCL_GLOBAL_BUFFER const Object *light = &objects[i];
 		if (light->type == MODEL) continue;
 		if (!viszero(light->emission)) {
 			// this is a light source (as it has an emission component)...
+            lightsVisited++;
+
 			// the shadow ray starts at the hitPoint and goes to a random point on the light
 			Ray shadowRay;
 			shadowRay.o = *hitPoint;
@@ -303,8 +307,9 @@ static void SampleLights(
 static void RadiancePathTracing(
     // the scene
     OCL_GLOBAL_BUFFER const Object *objects,
-	// size of the scene
+	// size of the scene (objects and lights)
 	const unsigned int objectCount,
+	const unsigned int lightCount,
 	// primary ray
 	const Ray *startRay,
 	// seeds for random numbers
@@ -398,7 +403,7 @@ static void RadiancePathTracing(
 			// -------------------------------------
 
 			vec Ld;
-			SampleLights(objects, objectCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
 
@@ -519,6 +524,7 @@ static void RadiancePathTracing(
 static void RadianceDirectLighting(
 	OCL_GLOBAL_BUFFER const Object *objects,
 	const unsigned int objectCount,
+	const unsigned int lightCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
 	vec *result) {
@@ -591,7 +597,7 @@ static void RadianceDirectLighting(
 			/* Direct lighting component */
 
 			vec Ld;
-			SampleLights(objects, objectCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, throughput, Ld);
 			vadd(rad, rad, Ld);
 

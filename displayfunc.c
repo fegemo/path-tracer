@@ -20,6 +20,7 @@ extern void updateRendering();
 extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
+extern unsigned int lightCount;
 extern int currentSample;
 extern double startRenderingTime;
 
@@ -81,7 +82,7 @@ void stripExtension(char *fileName)
 ///
 /// Reads a scene file and saves the objects in the objects global array.
 ///
-int readScene(char *fileName) {
+void readScene(char *fileName) {
 	fprintf(stderr, "Reading scene: %s\n", fileName);
 
 	FILE *f = fopen(fileName, "r");
@@ -121,6 +122,7 @@ int readScene(char *fileName) {
 	objects = (Object *)malloc(sizeof(Object) * objectCount);
 	unsigned int lineIndex;
 	unsigned int addedObjects = 0;
+	lightCount = 0;
 	for (lineIndex = 0; lineIndex < objectCount; lineIndex++) {
         Object *obj = &objects[lineIndex + addedObjects];
 		int mat;
@@ -142,6 +144,12 @@ int readScene(char *fileName) {
 				&obj->emission.x, &obj->emission.y, &obj->emission.z,
 				&obj->color.x, &obj->color.y, &obj->color.z,
 				&mat);
+
+            if (readValuesCount != 11) {
+                fprintf(stderr, "Failed to read sphere #%d: %d\n", lineIndex, readValuesCount);
+                exit(-1);
+            }
+
             switch (mat) {
                 case 0: obj->refl = DIFF; break;
                 case 1: obj->refl = SPEC; break;
@@ -154,11 +162,9 @@ int readScene(char *fileName) {
 
             obj->area = 4 * FLOAT_PI * obj->radius*obj->radius;
 
-            if (readValuesCount != 11) {
-                fprintf(stderr, "Failed to read sphere #%d: %d\n", lineIndex, readValuesCount);
-                exit(-1);
+            if (!viszero(obj->emission)) {
+                lightCount++;
             }
-
 		} else if (strcmp(objectTypeString, "triangle") == 0) {
 		    obj->type = TRIANGLE;
 		    Object *tri = obj;
@@ -169,6 +175,11 @@ int readScene(char *fileName) {
                 &obj->emission.x, &obj->emission.y, &obj->emission.z,
                 &obj->color.x, &obj->color.y, &obj->color.z,
                 &mat);
+
+            if (readValuesCount != 16) {
+                fprintf(stderr, "Failed to read triangle #%d: %d\n", lineIndex, readValuesCount);
+                exit(-1);
+            }
 //            printf("triangle: %f %f %f   %f %f %f   %f %f %f   %f %f %f   %f %f %f    %d\n",
 //                   obj->p1.x, obj->p1.y, obj->p1.z, obj->p2.x, obj->p2.y, obj->p2.z, obj->p3.x, obj->p3.y, obj->p3.z, obj->emission.x, obj->emission.y, obj->emission.z, obj->color.x, obj->color.y, obj->color.z, obj->refl);
             switch (mat) {
@@ -181,41 +192,35 @@ int readScene(char *fileName) {
             }
 
 
-                // sets a center of the triangle (in case it's a light source) and its radius
-                vclr(tri->center)
-                vadd(tri->center, tri->p1, tri->center);
-                vadd(tri->center, tri->p2, tri->center);
-                vadd(tri->center, tri->p3, tri->center);
-                vsmul(tri->center, 1/3.0f, tri->center);
+            // sets a center of the triangle (in case it's a light source) and its radius
+            vclr(tri->center)
+            vadd(tri->center, tri->p1, tri->center);
+            vadd(tri->center, tri->p2, tri->center);
+            vadd(tri->center, tri->p3, tri->center);
+            vsmul(tri->center, 1/3.0f, tri->center);
 
-                // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
-                // the area of the circle outside the triangle is (abc)/4area
-                float a, b, c;
-                a = dist(tri->p2, tri->p1);
-                b = dist(tri->p3, tri->p2);
-                c = dist(tri->p1, tri->p3);
-                vec e1; vsub(e1, tri->p2, tri->p1);
-                vec e2; vsub(e2, tri->p3, tri->p1);
-                vec normal; vxcross(normal, e1, e2);
-                tri->area = norm(normal) * 0.5f;
-                tri->radius = (a*b*c)/(4*tri->area);
-                vnorm(normal);
+            // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
+            // the area of the circle outside the triangle is (abc)/4area
+            float a, b, c;
+            a = dist(tri->p2, tri->p1);
+            b = dist(tri->p3, tri->p2);
+            c = dist(tri->p1, tri->p3);
+            vec e1; vsub(e1, tri->p2, tri->p1);
+            vec e2; vsub(e2, tri->p3, tri->p1);
+            vec normal; vxcross(normal, e1, e2);
+            tri->area = norm(normal) * 0.5f;
+            tri->radius = (a*b*c)/(4*tri->area);
+            vnorm(normal);
 
-                printf("tri #%d normal: %.2f %.2f %.2f\n", lineIndex + addedObjects, normal.x, normal.y, normal.z);
-
-
-                if (!viszero(tri->emission)) {
-                    printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", tri->p1.x, tri->p1.y, tri->p1.z, tri->p2.x, tri->p2.y, tri->p2.z, tri->p3.x, tri->p3.y, tri->p3.z);
-                    printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
-                    printf("Area: %f\n", tri->area);
-                    printf("Raio: %f\n", tri->radius);
-                }
+            printf("tri #%d normal: %.2f %.2f %.2f\n", lineIndex + addedObjects, normal.x, normal.y, normal.z);
 
 
-
-            if (readValuesCount != 16) {
-                fprintf(stderr, "Failed to read triangle #%d: %d\n", lineIndex, readValuesCount);
-                exit(-1);
+            if (!viszero(tri->emission)) {
+                lightCount++;
+//                printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", tri->p1.x, tri->p1.y, tri->p1.z, tri->p2.x, tri->p2.y, tri->p2.z, tri->p3.x, tri->p3.y, tri->p3.z);
+//                printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
+//                printf("Area: %f\n", tri->area);
+//                printf("Raio: %f\n", tri->radius);
             }
 		} else if (strcmp(objectTypeString, "model") == 0) {
 		    char modelFilePath[200];
@@ -255,7 +260,6 @@ int readScene(char *fileName) {
                 exit(-1);
             }
 
-//            unsigned int flags = TINYOBJ_FLAG_TRIANGULATE;
             unsigned int flags = (unsigned int) NULL;
             int ret = tinyobj_parse_obj(&attrib, &shapes, &num_shapes, &materials,
                                     &num_materials, data, data_len, flags);
@@ -264,8 +268,8 @@ int readScene(char *fileName) {
                 exit(1);
             }
 
-            printf("# of shapes    = %d\n", (int)num_shapes);
-            printf("# of materials = %d\n", (int)num_materials);
+//            printf("# of shapes    = %d\n", (int)num_shapes);
+//            printf("# of materials = %d\n", (int)num_materials);
 
 
             unsigned int numTriangles = attrib.num_face_num_verts;
@@ -328,8 +332,9 @@ int readScene(char *fileName) {
 
 
                 if (!viszero(tri->emission)) {
-                    printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
-                    printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
+                    lightCount++;
+//                    printf("Tri emitindo luz: %f %f %f\t%f %f %f\t%f %f %f\n", p1.x, p1.y, p1.z, p2.x, p2.y, p2.z, p3.x, p3.y, p3.z);
+//                    printf("Color: %f %f %f\tEmission: %f %f %f\n", tri->color.x, tri->color.y, tri->color.z, tri->emission.x, tri->emission.y, tri->emission.z);
                 }
 
 
@@ -352,7 +357,10 @@ int readScene(char *fileName) {
 
 	fclose(f);
 
-	return objectCount;
+//	int *counts = (int*) malloc(sizeof(int) * 2);
+//	counts[0] = objectCount;
+//	counts[1] = lightCount;
+//	return counts;
 }
 
 void updateCamera(int delta) {

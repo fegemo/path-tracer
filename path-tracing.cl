@@ -53,7 +53,8 @@ __kernel void radianceGPU(
 	const int width, const int height,
 	const int currentSample,
 	__global int *pixels,
-	__global int *debug) {
+	__global int *debug,
+	const unsigned int lightCount) {
 
     debug[0] = sizeof(Object);
     const int gid = get_global_id(0);
@@ -77,7 +78,7 @@ __kernel void radianceGPU(
 	// shoots the ray in the scene and receives back a radiance value
 	// the output is returned on "radiance"
 	vec radiance;
-	RadiancePathTracing(object, objectCount, &ray, &seed0, &seed1, &radiance);
+	RadiancePathTracing(object, objectCount, lightCount, &ray, &seed0, &seed1, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
