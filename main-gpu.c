@@ -11,6 +11,7 @@
 #include "simplernd.h"
 #include "displayfunc.h"
 #include "time-utils.h"
+#include "scene.h"
 
 /* Options */
 static int useGPU = 1;
@@ -38,6 +39,7 @@ int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
 unsigned int lightCount;
+Scene scene;
 int *debug;
 
 
@@ -758,6 +760,9 @@ void updateRendering() {
     // sets the number of lights in the scene
     SET_KERNEL_ARG(kernel, 10, unsigned int, &lightCount);
 
+    // sets the scene params
+    SET_KERNEL_ARG(kernel, 11, Scene, &scene);
+
 
 	// asks the device to execute the kernel
 	if (currentSample < 20) {
@@ -928,7 +933,6 @@ int main(int argc, char *argv[]) {
 		exit(-1);
     }
 
-//    const int numberOfObjects = readScene(sceneName);
     readScene(sceneName);
 
 	updateCameraBasis(&camera);

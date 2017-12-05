@@ -9,6 +9,7 @@
 #include "geom.h"
 #include "geomfunc.h"
 #include "displayfunc.h"
+#include "scene.h"
 
 int workGroupSize = 1;
 
@@ -19,6 +20,7 @@ int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
 unsigned int lightCount;
+Scene scene;
 double startRenderingTime;
 
 extern char captionLine1[];
@@ -79,9 +81,9 @@ void updateRendering(void) {
 			const Ray ray = {rorig, rdir};
 			vec radiance;
 			RadiancePathTracing(objects, objectCount, lightCount, &ray,
-					&seeds[i2], &seeds[i2 + 1], &radiance);
+					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, &radiance);
 //			RadianceDirectLighting(objects, objectCount, lightCount, &ray,
-//					&seeds[i2], &seeds[i2 + 1], &radiance);
+//					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, &radiance);
 
 			if (currentSample == 0) {
 				colors[i] = radiance;
@@ -94,9 +96,10 @@ void updateRendering(void) {
 				colors[i].z = (colors[i].z * k1 + radiance.z) * k2;
 			}
 
-			pixels[y * width + x] = toInt(colors[i].x) |
-					(toInt(colors[i].y) << 8) |
-					(toInt(colors[i].z) << 16);
+			pixels[y * width + x] =
+                    (toInt(colors[i].x, scene.gammaCorrection)) |
+					(toInt(colors[i].y, scene.gammaCorrection) << 8) |
+					(toInt(colors[i].z, scene.gammaCorrection) << 16);
 		}
 	}
 

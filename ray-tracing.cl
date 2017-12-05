@@ -2,6 +2,7 @@
 
 #include "camera.h"
 #include "geomfunc.h"
+#include "scene.h"
 
 static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 		unsigned int *seed0, unsigned int *seed1,
@@ -37,7 +38,8 @@ __kernel void radianceGPU(
 	const int currentSample,
 	__global int *pixels,
 	__global int *debug,
-	const unsigned int lightCount) {
+	const unsigned int lightCount,
+	const Scene scene) {
 
     const int gid = get_global_id(0);
 	const int gid2 = 2 * gid;
@@ -55,7 +57,7 @@ __kernel void radianceGPU(
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
 	vec radiance;
-	RadianceDirectLighting(object, objectCount, lightCount, &ray, &seed0, &seed1, &radiance);
+	RadianceDirectLighting(object, objectCount, lightCount, &ray, &seed0, &seed1, scene.skyColor1, scene.skyColor2, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
@@ -69,9 +71,10 @@ __kernel void radianceGPU(
 		colors[i].z = (colors[i].z * k1  + radiance.z) * k2;
 	}
 
-	pixels[y * width + x] = toInt(colors[i].x) |
-			(toInt(colors[i].y) << 8) |
-			(toInt(colors[i].z) << 16);
+	pixels[y * width + x] =
+            (toInt(colors[i].x, scene.gammaCorrection))       |
+			(toInt(colors[i].y, scene.gammaCorrection) << 8)  |
+			(toInt(colors[i].z, scene.gammaCorrection) << 16);
 
 	seedsInput[gid2] = seed0;
 	seedsInput[gid2 + 1] = seed1;

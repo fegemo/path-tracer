@@ -1,3 +1,4 @@
+gamma 1  sky1 0.15 0.3 0.5  sky2 1 1 1
 camera 20 80 150  0 15 0
 size 783
 sphere 8     50 80 90   25 25 25  0 0 0           0

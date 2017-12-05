@@ -9,6 +9,7 @@
 #include "geom.h"
 #include "displayfunc.h"
 #include "time-utils.h"
+#include "scene.h"
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "tinyobj_loader_c.h"
@@ -21,6 +22,8 @@ extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
 extern unsigned int lightCount;
+extern float gammaCorrection;
+extern Scene scene;
 extern int currentSample;
 extern double startRenderingTime;
 
@@ -94,8 +97,19 @@ void readScene(char *fileName) {
 	strcpy(sceneTitle, basename(fileName));
 	stripExtension(sceneTitle);
 
+	int c;
+	// line: gamma correction, sky colors
+	c = fscanf(f, "gamma %f  sky1 %f %f %f  sky2 %f %f %f\n", &scene.gammaCorrection,
+            &scene.skyColor1.x, &scene.skyColor1.y, &scene.skyColor1.z,
+            &scene.skyColor2.x, &scene.skyColor2.y, &scene.skyColor2.z);
+    if (c != 7) {
+        scene.gammaCorrection = 2.2f;
+        vinit(scene.skyColor1, 0.15f, 0.3f, 0.5f);
+        vinit(scene.skyColor2, 1.f, 1.f, 1.f);
+    }
+
 	// line 1: camera configuration: camera eye.x eye.y eye.z  target.x target.y target.z
-	int c = fscanf(f,"camera %f %f %f  %f %f %f\n",
+	c = fscanf(f,"camera %f %f %f  %f %f %f\n",
 			&camera.orig.x, &camera.orig.y, &camera.orig.z,
 			&camera.target.x, &camera.target.y, &camera.target.z);
 	camera.pitch = 0;

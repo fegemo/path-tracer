@@ -421,16 +421,10 @@ static void SampleLights(
 
 
 
-static vec ComputeBackgroundColor(const vec direction) {
+static vec ComputeBackgroundColor(const vec direction, const vec sky1, const vec sky2) {
     vec skyDirection = {-.41f, -.82f, .41f};
     float position = (vdot(direction, skyDirection) + 1) / 2;
-	vec firstColor = {0.15f, 0.3f, 0.5f};
-	vec secondColor = {1.f, 1.f, 1.f};
-	vec interpolatedColor; affine(interpolatedColor, position, firstColor, secondColor);
-
-	// sky is always 100% illuminated
-	float radianceMultiplier = 1.0;
-	vsmul(interpolatedColor, radianceMultiplier, interpolatedColor);
+	vec interpolatedColor; affine(interpolatedColor, position, sky1, sky2);
 	return interpolatedColor;
 }
 
@@ -444,6 +438,8 @@ static void RadiancePathTracing(
 	const Ray *startRay,
 	// seeds for random numbers
 	unsigned int *seed0, unsigned int *seed1,
+	// sky colors
+	const vec sky1, const vec sky2,
 	// the radiance found for the ray
 	vec *result) {
 
@@ -468,9 +464,8 @@ static void RadiancePathTracing(
 
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			// if the ray missed, return a sky color
-            vec backgroundColor = ComputeBackgroundColor(currentRay.d);
+            vec backgroundColor = ComputeBackgroundColor(currentRay.d, sky1, sky2);
             vmul(*result, throughput, backgroundColor);
-//			*result = rad * ComputeBackgroundColor(currentRay.d);
 
 			return;
 		}
@@ -659,6 +654,8 @@ static void RadianceDirectLighting(
 	const unsigned int lightCount,
 	const Ray *startRay,
 	unsigned int *seed0, unsigned int *seed1,
+	// sky colors
+	const vec sky1, const vec sky2,
 	vec *result) {
 
 	Ray currentRay; rassign(currentRay, *startRay);
@@ -679,9 +676,8 @@ static void RadianceDirectLighting(
 		unsigned int id = 0;
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			// if the ray missed, return a sky color
-            vec backgroundColor = ComputeBackgroundColor(currentRay.d);
+            vec backgroundColor = ComputeBackgroundColor(currentRay.d, sky1, sky2);
             vmul(*result, throughput, backgroundColor);
-//			*result = rad * ComputeBackgroundColor(currentRay.d);
 
 			return;
 		}

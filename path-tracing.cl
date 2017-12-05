@@ -3,6 +3,7 @@
 #include "camera.h"
 #include "geom.h"
 #include "geomfunc.h"
+#include "scene.h"
 
 static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 		unsigned int *seed0, unsigned int *seed1,
@@ -54,7 +55,8 @@ __kernel void radianceGPU(
 	const int currentSample,
 	__global int *pixels,
 	__global int *debug,
-	const unsigned int lightCount) {
+	const unsigned int lightCount,
+	const Scene scene) {
 
     debug[0] = sizeof(Object);
     const int gid = get_global_id(0);
@@ -78,7 +80,7 @@ __kernel void radianceGPU(
 	// shoots the ray in the scene and receives back a radiance value
 	// the output is returned on "radiance"
 	vec radiance;
-	RadiancePathTracing(object, objectCount, lightCount, &ray, &seed0, &seed1, &radiance);
+	RadiancePathTracing(object, objectCount, lightCount, &ray, &seed0, &seed1, scene.skyColor1, scene.skyColor2, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
@@ -107,9 +109,10 @@ __kernel void radianceGPU(
 		colors[i].z = (colors[i].z * k1  + radiance.z) * k2;
 	}
 
-	pixels[y * width + x] = toInt(colors[i].x) |    // blue
-			(toInt(colors[i].y) << 8) |             // green
-			(toInt(colors[i].z) << 16);             // red... and alpha?
+	pixels[y * width + x] =
+            (toInt(colors[i].x, scene.gammaCorrection)) |         // blue
+			(toInt(colors[i].y, scene.gammaCorrection) << 8) |    // green
+			(toInt(colors[i].z, scene.gammaCorrection) << 16);    // red
 
 	seedsInput[gid2] = seed0;
 	seedsInput[gid2 + 1] = seed1;

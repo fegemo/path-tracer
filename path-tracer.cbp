@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 path-tracing.cl 640 480 scenes/obj-model.txt" />
+				<Option parameters="1 0 ray-tracing.cl 640 480 scenes/simple-spheres.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -92,10 +92,12 @@
 		<Unit filename="ray-tracing.cl">
 			<Option target="&lt;{~None~}&gt;" />
 		</Unit>
+		<Unit filename="scene.h" />
 		<Unit filename="scenes/caustic.txt" />
 		<Unit filename="scenes/caustic3.txt" />
 		<Unit filename="scenes/complex.txt" />
 		<Unit filename="scenes/cornell-original.txt" />
+		<Unit filename="scenes/cornell-with-hole.txt" />
 		<Unit filename="scenes/cornell.txt" />
 		<Unit filename="scenes/cornell_large.txt" />
 		<Unit filename="scenes/large-object.txt" />
