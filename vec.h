@@ -23,6 +23,7 @@ typedef struct {
 #define viszero(v) (((v).x == 0.f) && ((v).x == 0.f) && ((v).z == 0.f))
 #define norm(v) (sqrt((v).x*(v).x + (v).y*(v).y + (v).z*(v).z))
 #define dist(a, b) (sqrt( ((a).x-(b).x)*((a).x-(b).x)  +   ((a).y-(b).y)*((a).y-(b).y)   +   ((a).z-(b).z)*((a).z-(b).z)))
+#define affine(v, t, a, b) vinit(v, (a).x*t + (b).x*(1-t), (a).y*t + (b).y*(1-t), (a).z*t + (b).z*(1-t))
 
 #ifndef GPU_KERNEL
 #define clamp(x, a, b) ((x) < (a) ? (a) : ((x) > (b) ? (b) : (x)))

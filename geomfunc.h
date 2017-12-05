@@ -420,6 +420,20 @@ static void SampleLights(
 //}
 
 
+
+static vec ComputeBackgroundColor(const vec direction) {
+    vec skyDirection = {-.41f, -.82f, .41f};
+    float position = (vdot(direction, skyDirection) + 1) / 2;
+	vec firstColor = {0.15f, 0.3f, 0.5f};
+	vec secondColor = {1.f, 1.f, 1.f};
+	vec interpolatedColor; affine(interpolatedColor, position, firstColor, secondColor);
+
+	// sky is always 100% illuminated
+	float radianceMultiplier = 1.0;
+	vsmul(interpolatedColor, radianceMultiplier, interpolatedColor);
+	return interpolatedColor;
+}
+
 static void RadiancePathTracing(
     // the scene
     OCL_GLOBAL_BUFFER const Object *objects,
@@ -453,9 +467,10 @@ static void RadiancePathTracing(
 		unsigned int id = 0;
 
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
-			*result = rad;
-			// if the ray missed, return just the color so far...
-			// we could put a skybox here...
+			// if the ray missed, return a sky color
+            vec backgroundColor = ComputeBackgroundColor(currentRay.d);
+            vmul(*result, throughput, backgroundColor);
+//			*result = rad * ComputeBackgroundColor(currentRay.d);
 
 			return;
 		}
@@ -660,10 +675,14 @@ static void RadianceDirectLighting(
 			return;
 		}
 
-		float t; /* distance to intersection */
-		unsigned int id = 0; /* id of intersected object */
+		float t;
+		unsigned int id = 0;
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
-			*result = rad; /* if miss, return */
+			// if the ray missed, return a sky color
+            vec backgroundColor = ComputeBackgroundColor(currentRay.d);
+            vmul(*result, throughput, backgroundColor);
+//			*result = rad * ComputeBackgroundColor(currentRay.d);
+
 			return;
 		}
 

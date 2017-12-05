@@ -28,14 +28,16 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 }
 
 __kernel void radianceGPU(
-    __global vec *colors, __global unsigned int *seedsInput,
-	__global Object *object, OCL_CONSTANT_BUFFER Camera *camera,
+    __global vec *colors,
+    __global unsigned int *seedsInput,
+	__global Object *object,
+	OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int objectCount,
-	const unsigned int lightCount,
 	const int width, const int height,
 	const int currentSample,
 	__global int *pixels,
-	__global int *debug) {
+	__global int *debug,
+	const unsigned int lightCount) {
 
     const int gid = get_global_id(0);
 	const int gid2 = 2 * gid;

@@ -710,7 +710,7 @@ static void executeKernel() {
 #define SET_KERNEL_ARG(kernel, i, type, value) do {\
         cl_int status = clSetKernelArg(kernel, i, sizeof(type), (void*)(value));\
         if (status != CL_SUCCESS) {\
-            fprintf(stderr, "Failed to set OpenCL arg. #%d: %d\n", (i+1), status);\
+            fprintf(stderr, "Failed to set OpenCL arg. #%d: %d\n", i, status);\
         }\
     } while(0)
 

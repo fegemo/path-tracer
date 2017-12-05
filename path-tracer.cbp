@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 path-tracing.cl 640 480 scenes/cornell-original.txt" />
+				<Option parameters="1 0 path-tracing.cl 640 480 scenes/simple-spheres.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -100,6 +100,7 @@
 		<Unit filename="scenes/cornell_large.txt" />
 		<Unit filename="scenes/large-object.txt" />
 		<Unit filename="scenes/obj-model.txt" />
+		<Unit filename="scenes/simple-spheres.txt" />
 		<Unit filename="scenes/simple.txt" />
 		<Unit filename="scenes/table-and-mirror.txt" />
 		<Unit filename="simplernd.h" />
