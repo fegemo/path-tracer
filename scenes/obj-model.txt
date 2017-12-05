@@ -3,7 +3,7 @@ size 10
 model models/plane-x.obj  90 69 0   -1 70 60  0 0 0  0.25 .25 0.75  0
 model models/plane-x.obj -89 69 0    1 70 60  0 0 0  0.75 .25 0.25  0
 model models/plane-y.obj  0  0 0    100 -1 100  0 0 0  0.75 .75 0.75  0
-model models/cube.obj  0 10 0  16 16 16  0 0 0  0.4 0.7 0.1  1
+model models/cube.obj  0 10 0  16 16 16  0 0 0  0.4 0.7 0.1  0
 model models/plane-y.obj  0 100 0   100 1 100  0 0 0  0.75 .75 0.75  0
 model models/plane-z.obj  0 70 -60   100 75 1  0 0 0  0.75 .75 0.75  0
 model models/table.obj  27 6 47  16 16 16  0 0 0  0.5 0.2 0  0
