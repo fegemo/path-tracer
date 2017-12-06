@@ -1,17 +1,18 @@
 gamma 2.2  sky1 0 0 0  sky2 0 0 0
 camera 0 45 205.6  0 44.957388 204.6
 materials 0
-objects 9
+objects 8
 sphere 10000  9946 40.8 81.6   0 0 0     0.75 0.25 0.25  0
 sphere 10000  -9944 40.8 81.6  0 0 0      0.25 0.25 0.75  0
 sphere 10000  0 40.8 10000     0 0 0     0.75 0.75 0.75  0
 sphere 10000  0 40.8 -9730     0 0 0     0 0 0          0
 sphere 10000  0 10000 81.6     0 0 0     0.75 0.75 0.75  0
 sphere 10000  0 -9918.4 81.6  0 0 0      0.75 0.75 0.75  0
-sphere 5   0 65 40        12 12 12      0 0 0    0
-model models/cube-rotated-other.obj  -25 17.5 47  16 35 16  0 0 0  0.95 0.95 0.95  0
+model models/cylinder.obj  -25 8 47  16 16 16  4 4 4  0.82 0.68 0.68  0
 model models/cube-rotated.obj   25 6 67  16 16 16  0 0 0  0.95 0.95 0.95  0
 
+model models/plane-y-down.obj  0 81 40  10 1 10  12 12 12  0 0 0  0
+sphere 5   0 65 40        12 12 12      0 0 0    0
 model models/plane-y-down.obj  0 81 40  10 1 10  12 12 12  0 0 0  0
 triangle 27 16.5 47  73 16.5 78  73 50 47  0 0 0  0.9 0.5 0.1  0
 triangle 27 50 47  73 50 78  73 65 47  0 0 0  0.5 0.9 0.1  0

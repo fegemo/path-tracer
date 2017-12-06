@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 path-tracing.cl 640 480 scenes/materials.txt" />
+				<Option parameters="1 0 path-tracing.cl 1024 576 scenes/cornell-with-hole.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -97,15 +97,17 @@
 		<Unit filename="scenes/caustic.txt" />
 		<Unit filename="scenes/caustic3.txt" />
 		<Unit filename="scenes/complex.txt" />
+		<Unit filename="scenes/cornell-large.txt" />
 		<Unit filename="scenes/cornell-original.txt" />
 		<Unit filename="scenes/cornell-with-hole.txt" />
 		<Unit filename="scenes/cornell.txt" />
-		<Unit filename="scenes/cornell_large.txt" />
 		<Unit filename="scenes/large-object.txt" />
 		<Unit filename="scenes/materials.txt" />
 		<Unit filename="scenes/obj-model.txt" />
 		<Unit filename="scenes/simple-spheres.txt" />
 		<Unit filename="scenes/simple.txt" />
+		<Unit filename="scenes/skybox.txt" />
+		<Unit filename="scenes/stacked-spheres.txt" />
 		<Unit filename="scenes/table-and-mirror.txt" />
 		<Unit filename="simplernd.h" />
 		<Unit filename="texture.h" />
