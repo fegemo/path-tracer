@@ -444,11 +444,11 @@ static void RadiancePathTracing(
 	// materials
 	OCL_GLOBAL_BUFFER const Material *materials,
 	// the radiance found for the ray
-	vec *result) {
+	vec *radiance) {
 
 	Ray currentRay; rassign(currentRay, *startRay);
-	vec rad; vinit(rad, 0.f, 0.f, 0.f);
-	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
+	vec L; vinit(L, 0.f, 0.f, 0.f);
+	vec pathThroughput; vinit(pathThroughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
@@ -456,8 +456,7 @@ static void RadiancePathTracing(
 		// no russian roulette so threads finish at the same time
 		// we bounce the ray for 6 times (primary + 6 = 7)
 		if (depth > 6) {
-			*result = rad;
-			return;
+			break;
 		}
 
 		// distance to intersection
@@ -468,7 +467,7 @@ static void RadiancePathTracing(
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			// if the ray missed, return a sky color
             vec backgroundColor = ComputeBackgroundColor(currentRay.d, sky1, sky2);
-            vmul(*result, throughput, backgroundColor);
+            vmul(*radiance, pathThroughput, backgroundColor);
 
 			return;
 		}
@@ -513,20 +512,19 @@ static void RadiancePathTracing(
 				// reduce the emitted color according to the ray hitting angle and normal, then by this throughput,
 				// then adds it to the output radiance
 				vsmul(emittedColor, fabs(dp), emittedColor);
-				vmul(emittedColor, throughput, emittedColor);
-				vadd(rad, rad, emittedColor);
+				vmul(emittedColor, pathThroughput, emittedColor);
+				vadd(L, L, emittedColor);
 			}
 
 			// light emitting objects do not bounce the ray, so we return
-			*result = rad;
-			return;
+			break;
 		}
 
 		// 100% DIFFUSE material
 		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
 			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
 			specularBounce = 0;
-			vmul(throughput, throughput, obj->color);
+			vmul(pathThroughput, pathThroughput, obj->color);
 
 			// direct lighting component (splitting)
 			// -------------------------------------
@@ -534,8 +532,8 @@ static void RadiancePathTracing(
 			vec Ld;
 			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			//UniformSampleOneLight(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
-			vmul(Ld, throughput, Ld);
-			vadd(rad, rad, Ld);
+			vmul(Ld, pathThroughput, Ld);
+			vadd(L, L, Ld);
 
 			// diffuse component
 			// ----------------------------------------------------------------
@@ -576,6 +574,7 @@ static void RadiancePathTracing(
 
 			// finished this ray, let's go shoot the the next one
 			continue;
+
 		} else if (obj->material == CONDUCTOR) {
 			// 100% SPECULAR material
 			specularBounce = 1;
@@ -586,10 +585,11 @@ static void RadiancePathTracing(
 			vsub(newDir, currentRay.d, newDir);
 
 			// multiplies the throughput by the object color
-			vmul(throughput, throughput, obj->color);
+			vmul(pathThroughput, pathThroughput, obj->color);
 
 			// sets up the next ray in the series and shoots it in the scene
 			rinit(currentRay, hitPoint, newDir);
+
 			continue;
 		} else if (obj->material == DIELECTRIC) {
 			// 100% REFRACTION material
@@ -609,7 +609,7 @@ static void RadiancePathTracing(
 			float cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn);
 
 			if (cos2t < 0.f)  { /* Total internal reflection */
-				vmul(throughput, throughput, obj->color);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
@@ -628,27 +628,32 @@ static void RadiancePathTracing(
 			float R0 = a * a / (b * b);
 			float c = 1 - (into ? -ddn : vdot(transDir, normal));
 
-			float Re = R0 + (1 - R0) * c * c * c * c*c;
+			float Re = R0 + (1 - R0) * c * c * c * c * c;
 			float Tr = 1.f - Re;
 			float P = .25f + .5f * Re;
 			float RP = Re / P;
 			float TP = Tr / (1.f - P);
 
 			if (GetRandom(seed0, seed1) < P) { /* R.R. */
-				vsmul(throughput, RP, throughput);
-				vmul(throughput, throughput, obj->color);
+				vsmul(pathThroughput, RP, pathThroughput);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
 			} else {
-				vsmul(throughput, TP, throughput);
-				vmul(throughput, throughput, obj->color);
+				vsmul(pathThroughput, TP, pathThroughput);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rinit(currentRay, hitPoint, transDir);
 				continue;
 			}
+		} else if (obj->material == MATTE) {
+
+		} else if (obj->material == PLASTIC) {
 		}
 	}
+
+	*radiance = L;
 }
 
 static void RadianceDirectLighting(
@@ -661,11 +666,11 @@ static void RadianceDirectLighting(
 	const vec sky1, const vec sky2,
 	// materials
 	OCL_GLOBAL_BUFFER const Material *materials,
-	vec *result) {
+	vec *radiance) {
 
 	Ray currentRay; rassign(currentRay, *startRay);
-	vec rad; vinit(rad, 0.f, 0.f, 0.f);
-	vec throughput; vinit(throughput, 1.f, 1.f, 1.f);
+	vec L; vinit(L, 0.f, 0.f, 0.f);
+	vec pathThroughput; vinit(pathThroughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
 	int specularBounce = 1;
@@ -673,8 +678,7 @@ static void RadianceDirectLighting(
 	for (;; ++depth) {
 		// Removed Russian Roulette in order to improve execution on SIMT
 		if (depth > 6) {
-			*result = rad;
-			return;
+            break;
 		}
 
 		float t;
@@ -682,9 +686,9 @@ static void RadianceDirectLighting(
 		if (!Intersect(objects, objectCount, &currentRay, &t, &id)) {
 			// if the ray missed, return a sky color
             vec backgroundColor = ComputeBackgroundColor(currentRay.d, sky1, sky2);
-            vmul(*result, throughput, backgroundColor);
+            vmul(*radiance, pathThroughput, backgroundColor);
 
-			return;
+            return;
 		}
 
 		OCL_GLOBAL_BUFFER const Object *obj = &objects[id]; /* the hit object */
@@ -710,7 +714,6 @@ static void RadianceDirectLighting(
 		const float dp = vdot(normal, currentRay.d);
 
 		vec nl;
-		// SIMT optimization
 		const float invSignDP = -1.f * sign(dp);
 		vsmul(nl, invSignDP, normal);
 
@@ -719,27 +722,25 @@ static void RadianceDirectLighting(
 		if (!viszero(eCol)) {
 			if (specularBounce) {
 				vsmul(eCol, fabs(dp), eCol);
-				vmul(eCol, throughput, eCol);
-				vadd(rad, rad, eCol);
+				vmul(eCol, pathThroughput, eCol);
+				vadd(L, L, eCol);
 			}
 
-			*result = rad;
-			return;
+            break;
 		}
 
 		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
 			specularBounce = 0;
-			vmul(throughput, throughput, obj->color);
+			vmul(pathThroughput, pathThroughput, obj->color);
 
 			/* Direct lighting component */
 
 			vec Ld;
 			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
-			vmul(Ld, throughput, Ld);
-			vadd(rad, rad, Ld);
+			vmul(Ld, pathThroughput, Ld);
+			vadd(L, L, Ld);
 
-			*result = rad;
-			return;
+            break;
 		} else if (obj->material == CONDUCTOR) { /* Ideal SPECULAR reflection */
 			specularBounce = 1;
 
@@ -747,7 +748,7 @@ static void RadianceDirectLighting(
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
-			vmul(throughput, throughput, obj->color);
+			vmul(pathThroughput, pathThroughput, obj->color);
 
 			rinit(currentRay, hitPoint, newDir);
 			continue;
@@ -768,7 +769,7 @@ static void RadianceDirectLighting(
 			float cos2t = 1.f - nnt * nnt * (1.f - ddn * ddn);
 
 			if (cos2t < 0.f)  { /* Total internal reflection */
-				vmul(throughput, throughput, obj->color);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
@@ -794,20 +795,22 @@ static void RadianceDirectLighting(
 			float TP = Tr / (1.f - P);
 
 			if (GetRandom(seed0, seed1) < P) { /* R.R. */
-				vsmul(throughput, RP, throughput);
-				vmul(throughput, throughput, obj->color);
+				vsmul(pathThroughput, RP, pathThroughput);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rassign(currentRay, reflRay);
 				continue;
 			} else {
-				vsmul(throughput, TP, throughput);
-				vmul(throughput, throughput, obj->color);
+				vsmul(pathThroughput, TP, pathThroughput);
+				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rinit(currentRay, hitPoint, transDir);
 				continue;
 			}
 		}
 	}
+
+	*radiance = L;
 }
 
 #endif
