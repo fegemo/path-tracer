@@ -453,6 +453,37 @@ static void UniformSampleHemisphere(vec normal, unsigned int *seed0, unsigned in
     vadd(*outgoingDirection, *outgoingDirection, w);
 }
 
+void ComputeFresnelDielectric(float cosi, float eta_i, float eta_t, vec *F) {
+    // compute Fresnel reflectance for dielectric
+    cosi = clamp(cosi, -1.f, 1.f);
+
+    // compute indices of refraction for dielectric
+    bool entering = cosi > 0.;
+    float ei = eta_i, et = eta_t;
+    if (!entering) {
+        float temp = ei;
+        ei = et;
+        et = temp;
+    }
+
+    // compute sint using Snell's law
+    float sint = ei/et * sqrt(max(0.f, 1.f - cosi*cosi));
+    if (sint >= 1.f) {
+        // handle total internal reflection
+        vinit(*F, 1, 1, 1);
+    }
+    else {
+        float cost = sqrt(max(0.f, 1.f - sint*sint));
+        float rparl = ((et * cosi) - (ei * cost)) /
+                      ((et * cosi) + (ei * cost));
+        float rperp = ((ei * cosi) - (et * cost)) /
+                      ((ei * cosi) + (et * cost));
+
+        float component = (rparl*rparl + rperp*rperp) / 2.f;
+        vinit(*F, component, component, component);
+    }
+}
+
 static vec ComputeBackgroundColor(const vec direction, const vec sky1, const vec sky2) {
     vec skyDirection = {-.41f, -.82f, .41f};
     float position = (vdot(direction, skyDirection) + 1) / 2;
@@ -640,14 +671,13 @@ static void RadiancePathTracing(
 				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rassign(currentRay, reflRay);
-				continue;
 			} else {
 				vsmul(pathThroughput, TP, pathThroughput);
 				vmul(pathThroughput, pathThroughput, obj->color);
 
 				rinit(currentRay, hitPoint, transDir);
-				continue;
 			}
+            continue;
 		} else if (material->type == MATTE) {
 			// should not do the specular bounce
 			specularBounce = false;
@@ -717,8 +747,51 @@ static void RadiancePathTracing(
 			// finished this ray, let's go shoot the the next one
 			continue;
 
-		} else if (material->type == PLASTIC) {
-		}
+		} else if (material->type == PLASTIC + 1000) {
+		    // torrance-sparrow brdf/btdf
+		    vec f;
+            vec wo; vsmul(wo, -1, currentRay.d);
+            vec wi;
+
+
+            float cosThetaO = fabs(wo.z);
+            float cosThetaI = fabs(wi.z);
+            if (cosThetaI == 0.f || cosThetaO == 0.f) {
+                vclr(f);
+            };
+            vec wh; vadd(wh, wi, wo);
+            if (viszero(wh)) {
+                vclr(f);
+            }
+            vnorm(wh);
+            float cosThetaH = vdot(wi, wh);
+            vec F;
+            ComputeFresnelDielectric(cosThetaH, 1.5f, 1.f, &F);
+
+            float blinnDistribution;
+            {
+                float blinnExponent = 1.f / material->roughness;
+                blinnDistribution = (blinnExponent+2) * INV_TWOPI * pow(fabs(wh.z), blinnExponent);
+            }
+
+            float geometricTerm;
+            {
+                float NdotWh = fabs(wh.z);
+                float NdotWo = fabs(wo.z);
+                float NdotWi = fabs(wi.z);
+                float WOdotWh = fabs(vdot(wo, wh));
+                geometricTerm = min(1.f, min((2.f * NdotWh * NdotWo / WOdotWh),
+                                    (2.f * NdotWh * NdotWi / WOdotWh)));
+            }
+
+            vmul(f, material->ks, F);
+            vsmul(f, blinnDistribution * geometricTerm / (4.f * cosThetaI * cosThetaO), f);
+
+            // modulates pathThroughput by the brdf value
+            vmul(pathThroughput, pathThroughput, f);
+
+
+        }
 	}
 
 	*radiance = L;
