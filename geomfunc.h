@@ -421,6 +421,37 @@ static void SampleLights(
 //}
 
 
+static void UniformSampleHemisphere(vec normal, unsigned int *seed0, unsigned int *seed1, vec *outgoingDirection) {
+    // we'll sample a position in a unit circle that will be used to find how this currentRay
+    // will be reflected (as this is a diffuse material, it can go uniformly in any direction
+    // on the hemisphere)
+    float r1 = TWO_PI * GetRandom(seed0, seed1);
+    float r2 = GetRandom(seed0, seed1);
+    float r2s = sqrt(r2);
+
+    // w = the normal of the hitpoint
+    vec w; vassign(w, normal);
+
+    // u, v, w = orthonormal basis on the hitpoint of the object ('a' is just temporary)
+    vec u, a;
+    if (fabs(w.x) > .1f) {
+        vinit(a, 0.f, 1.f, 0.f);
+    } else {
+        vinit(a, 1.f, 0.f, 0.f);
+    }
+    vxcross(u, a, w);
+    vnorm(u);
+
+    vec v;
+    vxcross(v, w, u);
+
+    // finds the direction of the next ray on our path to trace
+    vsmul(u, cos(r1) * r2s, u);
+    vsmul(v, sin(r1) * r2s, v);
+    vadd(*outgoingDirection, u, v);
+    vsmul(w, sqrt(1 - r2), w);
+    vadd(*outgoingDirection, *outgoingDirection, w);
+}
 
 static vec ComputeBackgroundColor(const vec direction, const vec sky1, const vec sky2) {
     vec skyDirection = {-.41f, -.82f, .41f};
@@ -451,7 +482,7 @@ static void RadiancePathTracing(
 	vec pathThroughput; vinit(pathThroughput, 1.f, 1.f, 1.f);
 
 	unsigned int depth = 0;
-	int specularBounce = 1;
+	bool specularBounce = true;
 	for (;; ++depth) {
 		// no russian roulette so threads finish at the same time
 		// we bounce the ray for 6 times (primary + 6 = 7)
@@ -520,10 +551,11 @@ static void RadiancePathTracing(
 			break;
 		}
 
+		OCL_GLOBAL_BUFFER const Material *material = &materials[obj->materialId];
 		// 100% DIFFUSE material
-		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
-			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
-			specularBounce = 0;
+		if (material->type == LAMBERTIAN) {
+			// should not do the specular bounce... reduces the throughput by the object's color
+			specularBounce = false;
 			vmul(pathThroughput, pathThroughput, obj->color);
 
 			// direct lighting component (splitting)
@@ -538,46 +570,15 @@ static void RadiancePathTracing(
 			// diffuse component
 			// ----------------------------------------------------------------
 
-			// we'll sample a position in a unit circle that will be used to find how this currentRay
-			// will be reflected (as this is a diffuse material, it can go uniformly in any direction
-            // on the hemisphere)
-			float r1 = 2.f * FLOAT_PI * GetRandom(seed0, seed1);
-			float r2 = GetRandom(seed0, seed1);
-			float r2s = sqrt(r2);
-
-			// w = the normal of the hitpoint
-			vec w; vassign(w, nl);
-
-			// u, v, w = orthonormal basis on the hitpoint of the object ('a' is just temporary)
-			vec u, a;
-			if (fabs(w.x) > .1f) {
-				vinit(a, 0.f, 1.f, 0.f);
-			} else {
-				vinit(a, 1.f, 0.f, 0.f);
-			}
-			vxcross(u, a, w);
-			vnorm(u);
-
-			vec v;
-			vxcross(v, w, u);
-
-			// finds the direction of the next ray on our path to trace
-			vec newDir;
-			vsmul(u, cos(r1) * r2s, u);
-			vsmul(v, sin(r1) * r2s, v);
-			vadd(newDir, u, v);
-			vsmul(w, sqrt(1 - r2), w);
-			vadd(newDir, newDir, w);
-
 			currentRay.o = hitPoint;
-			currentRay.d = newDir;
+			UniformSampleHemisphere(nl, seed0, seed1, &currentRay.d);
 
 			// finished this ray, let's go shoot the the next one
 			continue;
 
-		} else if (obj->material == CONDUCTOR) {
+		} else if (material->type == CONDUCTOR) {
 			// 100% SPECULAR material
-			specularBounce = 1;
+			specularBounce = true;
 
 			// finds the perfectly reflected ray
 			vec newDir;
@@ -591,9 +592,9 @@ static void RadiancePathTracing(
 			rinit(currentRay, hitPoint, newDir);
 
 			continue;
-		} else if (obj->material == DIELECTRIC) {
+		} else if (material->type == DIELECTRIC) {
 			// 100% REFRACTION material
-			specularBounce = 1;
+			specularBounce = true;
 
 			vec newDir;
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
@@ -647,9 +648,76 @@ static void RadiancePathTracing(
 				rinit(currentRay, hitPoint, transDir);
 				continue;
 			}
-		} else if (obj->material == MATTE) {
+		} else if (material->type == MATTE) {
+			// should not do the specular bounce
+			specularBounce = false;
 
-		} else if (obj->material == PLASTIC) {
+			vec newDir;
+			UniformSampleHemisphere(nl, seed0, seed1, &newDir);
+
+			vec f; // brdf value
+			if (material->sigma == 0) {
+                // lambertian BRDF
+                vsmul(f, 1, material->kd);
+
+			}
+			else if (material->sigma > 0) {
+                vec wo; vsmul(wo, -1, currentRay.d);
+                vec wi; vassign(wi, newDir);
+
+			    // oren-nayar microfacets BRDF
+                float sinthetai = sqrt(max(0.f, 1.f - (wi.z*wi.z)));
+                float sinthetao = sqrt(max(0.f, 1.f - (wo.z*wo.z)));
+
+                // compute cosine term of Oren-Nayar model
+                float maxcos = 0.f;
+                if (sinthetai > 1e-4 && sinthetao > 1e-4) {
+                    float sinphii = sinthetai == 0 ? 0 : clamp(wi.y / sinthetai, -1.f, 1.f);
+                    float cosphii = sinthetai == 0 ? 1 : clamp(wi.x / sinthetai, -1.f, 1.f);
+                    float sinphio = sinthetao == 0 ? 0 : clamp(wo.y / sinthetao, -1.f, 1.f);
+                    float cosphio = sinthetao == 0 ? 1 : clamp(wo.x / sinthetao, -1.f, 1.f);
+                    float dcos = cosphii * cosphio + sinphii * sinphio;
+                    maxcos = max(0.f, dcos);
+                }
+
+
+                // compute sine and tangent terms of Oren-Nayar model
+                float sinalpha, tanbeta;
+                if (fabs(wi.z) > fabs(wo.z)) {
+                    sinalpha = sinthetao;
+                    tanbeta = sinthetai / fabs(wi.z);
+                }
+                else {
+                    sinalpha = sinthetai;
+                    tanbeta = sinthetao / fabs(wo.z);
+                }
+
+                vsmul(f, 1 * (material->A + material->B * maxcos * sinalpha * tanbeta), material->kd);
+            }
+
+            // modulates pathThroughput by the brdf value
+            vmul(pathThroughput, pathThroughput, f);
+
+
+			// direct lighting component (splitting)
+			// -------------------------------------
+
+			vec Ld;
+			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			//UniformSampleOneLight(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			vmul(Ld, pathThroughput, Ld);
+			vadd(L, L, Ld);
+
+			// diffuse component
+			// ----------------------------------------------------------------
+
+			currentRay.o = hitPoint;
+            currentRay.d = newDir;
+
+			// finished this ray, let's go shoot the the next one
+			continue;
+
+		} else if (material->type == PLASTIC) {
 		}
 	}
 
@@ -729,19 +797,19 @@ static void RadianceDirectLighting(
             break;
 		}
 
-		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
+		OCL_GLOBAL_BUFFER const Material *material = &materials[obj->materialId];
+		if (material->type == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
 			specularBounce = 0;
 			vmul(pathThroughput, pathThroughput, obj->color);
 
-			/* Direct lighting component */
-
+			// direct lighting component
 			vec Ld;
 			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
 			vmul(Ld, pathThroughput, Ld);
 			vadd(L, L, Ld);
 
             break;
-		} else if (obj->material == CONDUCTOR) { /* Ideal SPECULAR reflection */
+		} else if (material->type == CONDUCTOR) { /* Ideal SPECULAR reflection */
 			specularBounce = 1;
 
 			vec newDir;
@@ -752,7 +820,7 @@ static void RadianceDirectLighting(
 
 			rinit(currentRay, hitPoint, newDir);
 			continue;
-		} else if (obj->material == DIELECTRIC) {
+		} else if (material->type == DIELECTRIC) {
 			specularBounce = 1;
 
 			vec newDir;
@@ -807,6 +875,65 @@ static void RadianceDirectLighting(
 				rinit(currentRay, hitPoint, transDir);
 				continue;
 			}
+		} else if (material->type == MATTE) {
+			// should not do the specular bounce
+			specularBounce = false;
+
+			vec newDir;
+			UniformSampleHemisphere(nl, seed0, seed1, &newDir);
+
+			vec f; // brdf value
+			if (material->sigma == 0) {
+                // lambertian BRDF
+                vsmul(f, 1, material->kd);
+
+			}
+			else if (material->sigma > 0) {
+                vec wo; vsmul(wo, -1, currentRay.d);
+                vec wi; vassign(wi, newDir);
+
+			    // oren-nayar microfacets BRDF
+                float sinthetai = sqrt(max(0.f, 1.f - (wi.z*wi.z)));
+                float sinthetao = sqrt(max(0.f, 1.f - (wo.z*wo.z)));
+
+                // compute cosine term of Oren-Nayar model
+                float maxcos = 0.f;
+                if (sinthetai > 1e-4 && sinthetao > 1e-4) {
+                    float sinphii = sinthetai == 0 ? 0 : clamp(wi.y / sinthetai, -1.f, 1.f);
+                    float cosphii = sinthetai == 0 ? 1 : clamp(wi.x / sinthetai, -1.f, 1.f);
+                    float sinphio = sinthetao == 0 ? 0 : clamp(wo.y / sinthetao, -1.f, 1.f);
+                    float cosphio = sinthetao == 0 ? 1 : clamp(wo.x / sinthetao, -1.f, 1.f);
+                    float dcos = cosphii * cosphio + sinphii * sinphio;
+                    maxcos = max(0.f, dcos);
+                }
+
+
+                // compute sine and tangent terms of Oren-Nayar model
+                float sinalpha, tanbeta;
+                if (fabs(wi.z) > fabs(wo.z)) {
+                    sinalpha = sinthetao;
+                    tanbeta = sinthetai / fabs(wi.z);
+                }
+                else {
+                    sinalpha = sinthetai;
+                    tanbeta = sinthetao / fabs(wo.z);
+                }
+
+                vsmul(f, 1 * (material->A + material->B * maxcos * sinalpha * tanbeta), material->kd);
+            }
+
+            // modulates pathThroughput by the brdf value
+            vmul(pathThroughput, pathThroughput, f);
+
+			// direct lighting component
+			vec Ld;
+			SampleLights(objects, objectCount, lightCount, seed0, seed1, &hitPoint, &nl, &Ld);
+			vmul(Ld, pathThroughput, Ld);
+			vadd(L, L, Ld);
+
+            break;
+
+		} else if (material->type == PLASTIC) {
 		}
 	}
 

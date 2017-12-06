@@ -14,6 +14,8 @@ typedef enum {
 
 
 typedef struct {
+    short type;
+
     // matte, labertian
     vec kd;
     // plastic
@@ -23,6 +25,9 @@ typedef struct {
     float sigma;
     // plastic
     float roughness;
+
+    // specific pre calc'ed oren nayar values
+    float A, B;
 
 } Material;
 #endif // _MATERIAL_H_

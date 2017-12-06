@@ -28,7 +28,7 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Option use_console_runner="0" />
-				<Option parameters="480 320 scenes/materials.txt" />
+				<Option parameters="480 320 scenes/cornell.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />

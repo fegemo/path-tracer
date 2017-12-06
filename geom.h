@@ -8,6 +8,7 @@
 #define PI_OVER_TWO 1.57079632679489661923f
 #define TWO_PI 6.28318530717958647693f
 #define FOUR_PI 12.56637061435917295385f
+#define INV_PI 0.31830988618379067154f
 
 typedef struct {
 	vec o, d;
@@ -24,7 +25,7 @@ enum ObjectType {
 typedef struct {
     // for any type: type and material
     short type;
-    short material;
+    short materialId;
     vec emission;
     vec color;
 

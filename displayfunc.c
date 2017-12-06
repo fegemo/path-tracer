@@ -144,11 +144,18 @@ void readScene(char *fileName) {
         fprintf(stderr, "Failed to read the number of materials: %d\n", c);
         exit(-1);
 	}
+	// creates space for the 3 default materials
+	#define NUMBER_OF_DEFAULT_MATERIALS 3
+	scene.materialCount += NUMBER_OF_DEFAULT_MATERIALS;
 
 	// part 4: material descriptors
 	materials = (Material *)malloc(sizeof(Material) * scene.materialCount);
+	materials[0].type = LAMBERTIAN;
+	materials[1].type = CONDUCTOR;
+	materials[2].type = DIELECTRIC;
+
 	unsigned int lineIndex;
-	for (lineIndex = 0; lineIndex < scene.materialCount; lineIndex++) {
+	for (lineIndex = NUMBER_OF_DEFAULT_MATERIALS; lineIndex < scene.materialCount; lineIndex++) {
         Material *material = &materials[lineIndex];
         char materialTypeString[100];
 
@@ -159,6 +166,7 @@ void readScene(char *fileName) {
         }
 
         if (strcmp(materialTypeString, "matte") == 0) {
+            material->type = MATTE;
             readValuesCount = fscanf(f,"%f %f %f  %f\n",
                 &material->kd.x, &material->kd.y, &material->kd.z,
                 &material->sigma);
@@ -166,7 +174,14 @@ void readScene(char *fileName) {
                 fprintf(stderr, "Failed to read matte material descriptor. Expected 4, found %d value(s)\n", readValuesCount);
                 exit(-1);
             }
+            clamp(material->sigma, 0.f, 0.9f);
+//            material->sigma = ((float)FLOAT_PI/180.f) * (material->sigma);
+            float sigma2 = material->sigma*material->sigma;
+            material->A = 1.f - (sigma2 / (2.f * (sigma2 + 0.33f)));
+            material->B = 0.45f * sigma2 / (sigma2 + 0.09f);
+
         } else if (strcmp(materialTypeString, "plastic") == 0) {
+            material->type = PLASTIC;
             readValuesCount = fscanf(f,"%f %f %f  %f %f %f  %f\n",
                 &material->kd.x, &material->kd.y, &material->kd.z,
                 &material->ks.x, &material->ks.y, &material->ks.z,
@@ -217,7 +232,8 @@ void readScene(char *fileName) {
                 exit(-1);
             }
 
-            obj->material = getMaterialType(mat, lineIndex);
+            obj->materialId = getMaterialType(mat, lineIndex);
+            printf("Sphere material id: %d\n", obj->materialId);
             obj->area = 4 * FLOAT_PI * obj->radius*obj->radius;
 
             if (!viszero(obj->emission)) {
@@ -240,7 +256,7 @@ void readScene(char *fileName) {
             }
 //            printf("triangle: %f %f %f   %f %f %f   %f %f %f   %f %f %f   %f %f %f    %d\n",
 //                   obj->p1.x, obj->p1.y, obj->p1.z, obj->p2.x, obj->p2.y, obj->p2.z, obj->p3.x, obj->p3.y, obj->p3.z, obj->emission.x, obj->emission.y, obj->emission.z, obj->color.x, obj->color.y, obj->color.z, obj->refl);
-            obj->material = getMaterialType(mat, lineIndex);
+            obj->materialId = getMaterialType(mat, lineIndex);
 
 
             // the area of the circle outside the triangle is (abc)/4area
@@ -281,7 +297,7 @@ void readScene(char *fileName) {
                 exit(-1);
             }
 
-            obj->material = getMaterialType(mat, lineIndex);
+            obj->materialId = getMaterialType(mat, lineIndex);
 
             tinyobj_attrib_t attrib;
             tinyobj_shape_t* shapes = NULL;
@@ -321,7 +337,7 @@ void readScene(char *fileName) {
                 tri->type = TRIANGLE;
                 tri->emission = obj->emission;
                 tri->color = obj->color;
-                tri->material = obj->material;
+                tri->materialId = obj->materialId;
 
                 int idxVertex1 = attrib.faces[faceOffset+0].v_idx;
                 int idxVertex2 = attrib.faces[faceOffset+1].v_idx;
@@ -346,14 +362,6 @@ void readScene(char *fileName) {
                 tri->p2 = p2;
                 tri->p3 = p3;
 
-                // sets a center of the triangle (in case it's a light source) and its radius
-//                vclr(tri->center)
-//                vadd(tri->center, p1, tri->center);
-//                vadd(tri->center, p2, tri->center);
-//                vadd(tri->center, p3, tri->center);
-//                vsmul(tri->center, 1/3.0f, tri->center);
-
-                // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
                 // the area of the circle outside the triangle is (abc)/4area
                 float a, b, c;
                 a = dist(tri->p2, tri->p1);
@@ -363,7 +371,6 @@ void readScene(char *fileName) {
                 vec e2; vsub(e2, tri->p3, tri->p1);
                 vec normal; vxcross(normal, e1, e2);
                 tri->area = norm(normal) * 0.5f;
-//                tri->radius = (a*b*c)/(4*tri->area);
 
 
                 if (!viszero(tri->emission)) {
