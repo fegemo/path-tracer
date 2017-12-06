@@ -6,7 +6,7 @@
 typedef struct {
     float gammaCorrection;
     vec skyColor1, skyColor2;
-
+    unsigned int materialCount;
 } Scene;
 
 #endif // _SCENE_H_

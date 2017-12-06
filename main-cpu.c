@@ -18,6 +18,7 @@ static unsigned int *seeds;
 Camera camera;
 int currentSample = 0;
 Object *objects;
+Material *materials;
 unsigned int objectCount;
 unsigned int lightCount;
 Scene scene;
@@ -81,9 +82,9 @@ void updateRendering(void) {
 			const Ray ray = {rorig, rdir};
 			vec radiance;
 			RadiancePathTracing(objects, objectCount, lightCount, &ray,
-					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, &radiance);
+					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, materials, &radiance);
 //			RadianceDirectLighting(objects, objectCount, lightCount, &ray,
-//					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, &radiance);
+//					&seeds[i2], &seeds[i2 + 1], scene.skyColor1, scene.skyColor2, materials, &radiance);
 
 			if (currentSample == 0) {
 				colors[i] = radiance;

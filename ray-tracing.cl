@@ -1,6 +1,7 @@
 #define GPU_KERNEL
 
 #include "camera.h"
+#include "material.h"
 #include "geomfunc.h"
 #include "scene.h"
 
@@ -31,7 +32,7 @@ static void GenerateCameraRay(OCL_CONSTANT_BUFFER Camera *camera,
 __kernel void radianceGPU(
     __global vec *colors,
     __global unsigned int *seedsInput,
-	__global Object *object,
+	__global Object *objects,
 	OCL_CONSTANT_BUFFER Camera *camera,
 	const unsigned int objectCount,
 	const int width, const int height,
@@ -39,7 +40,8 @@ __kernel void radianceGPU(
 	__global int *pixels,
 	__global int *debug,
 	const unsigned int lightCount,
-	const Scene scene) {
+	const Scene scene,
+	__global const Material *materials) {
 
     const int gid = get_global_id(0);
 	const int gid2 = 2 * gid;
@@ -57,11 +59,10 @@ __kernel void radianceGPU(
 	GenerateCameraRay(camera, &seed0, &seed1, width, height, x, y, &ray);
 
 	vec radiance;
-	RadianceDirectLighting(object, objectCount, lightCount, &ray, &seed0, &seed1, scene.skyColor1, scene.skyColor2, &radiance);
+	RadianceDirectLighting(objects, objectCount, lightCount, &ray, &seed0, &seed1, scene.skyColor1, scene.skyColor2, materials, &radiance);
 
 	const int i = (height - y - 1) * width + x;
 	if (currentSample == 0) {
-		// Jens's patch for MacOS
 		vassign(colors[i], radiance);
 	} else {
 		const float k1 = currentSample;

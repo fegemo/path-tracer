@@ -8,6 +8,7 @@
 #include "camera.h"
 #include "vec.h"
 #include "geom.h"
+#include "material.h"
 #include "simplernd.h"
 #include "displayfunc.h"
 #include "time-utils.h"
@@ -23,6 +24,7 @@ static cl_mem colorBuffer;
 static cl_mem pixelBuffer;
 static cl_mem seedBuffer;
 static cl_mem objectBuffer;
+static cl_mem materialBuffer;
 static cl_mem cameraBuffer;
 static cl_mem debugBuffer;
 static cl_command_queue commandQueue;
@@ -39,6 +41,7 @@ int currentSample = 0;
 Object *objects;
 unsigned int objectCount;
 unsigned int lightCount;
+Material *materials;
 Scene scene;
 int *debug;
 
@@ -512,11 +515,7 @@ static void setUpOpenCL() {
     //      host_ptr (pointer to regular memory - a bit confusing...), errcode_ret
 	objectBuffer = clCreateBuffer(
             context,
-#ifdef __APPLE__
-            CL_MEM_READ_WRITE, // NOTE: not READ_ONLY because of Apple's OpenCL bug
-#else
 			CL_MEM_READ_ONLY,
-#endif
             sizeof(Object) * objectCount,
             NULL,
             &status);
@@ -547,15 +546,23 @@ static void setUpOpenCL() {
 		exit(-1);
 	}
 
+	// materials buffer
+	materialBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(Material) * (int)max(1, scene.materialCount), NULL, &status);
+	if (status != CL_SUCCESS) {
+        fprintf(stderr, "Failed to create OpenCL material buffer: %d\n", status);
+        exit(-1);
+	}
+	status = clEnqueueWriteBuffer(commandQueue, materialBuffer, CL_TRUE, 0, sizeof(Material) * (int)max(1, scene.materialCount),
+                               materials, 0, NULL, NULL);
+    if (status != CL_SUCCESS) {
+        fprintf(stderr, "Failed to write the OpenCL materials buffer: %d\n", status);
+    }
+
 
     // creates a buffer to hold information regarding the camera (eye, target)
 	cameraBuffer = clCreateBuffer(
             context,
-#ifdef __APPLE__
-            CL_MEM_READ_WRITE, // NOTE: not READ_ONLY because of Apple's OpenCL bug
-#else
 			CL_MEM_READ_ONLY,
-#endif
             sizeof(Camera),
             NULL,
             &status);
@@ -599,14 +606,10 @@ static void setUpOpenCL() {
 		exit(-1);
     }
 
-#ifdef __APPLE__
-	status = clBuildProgram(program, 1, devices, "-I. -D__APPLE__", NULL, NULL);
-#else
     // builds (compiles and links) the opencl program
     // program (id from createProgram), num_devices (devices that will run it),
     //      device_list, options ('command line'), ptn_notify (error cllbck), user_data
 	status = clBuildProgram(program, 1, devices, "-I. ", NULL, NULL);
-#endif
 	if (status != CL_SUCCESS) {
 		fprintf(stderr, "Failed to build OpenCL kernel: %d\n", status);
 
@@ -762,6 +765,9 @@ void updateRendering() {
 
     // sets the scene params
     SET_KERNEL_ARG(kernel, 11, Scene, &scene);
+
+    // sets the materials
+    SET_KERNEL_ARG(kernel, 12, cl_mem, &materialBuffer);
 
 
 	// asks the device to execute the kernel

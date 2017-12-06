@@ -16,10 +16,6 @@ typedef struct {
 #define rinit(r, a, b) { vassign((r).o, a); vassign((r).d, b); }
 #define rassign(a, b) { vassign((a).o, (b).o); vassign((a).d, (b).d); }
 
-enum Refl {
-	DIFF, SPEC, REFR
-}; /* material types, used in radiance() */
-
 
 enum ObjectType {
     SPHERE, TRIANGLE, MODEL
@@ -27,20 +23,20 @@ enum ObjectType {
 
 typedef struct {
     // for any type: type and material
-    short type;         // 2
-    short refl;         // 4
-    vec emission;       // 16
-    vec color;          // 28
+    short type;
+    short material;
+    vec emission;
+    vec color;
 
     // for spheres:
-    float radius;       // 32
-    vec center;         // 44
+    float radius;
+    vec center;
 
     // for triangles:
-    vec p1, p2, p3;     // 80
+    vec p1, p2, p3;
 
     // for objects that are lights (ie, emit color):
-    float area;         // 84
+    float area;
 
 } Object;
 

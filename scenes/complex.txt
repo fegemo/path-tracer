@@ -1,6 +1,7 @@
 gamma 1  sky1 0.15 0.3 0.5  sky2 1 1 1
 camera 20 80 150  0 15 0
-size 783
+materials 0
+objects 783
 sphere 8     50 80 90   25 25 25  0 0 0           0
 sphere 10000  0 -10050 0  0 0 0     0.75 0.75 0.75  0
 sphere 15 0 0 0 0 0 0 0.75 0 0 0

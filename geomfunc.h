@@ -2,6 +2,7 @@
 #define	_GEOMFUNC_H
 
 #include "geom.h"
+#include "material.h"
 #include "simplernd.h"
 
 #ifndef SMALLPT_GPU
@@ -440,6 +441,8 @@ static void RadiancePathTracing(
 	unsigned int *seed0, unsigned int *seed1,
 	// sky colors
 	const vec sky1, const vec sky2,
+	// materials
+	OCL_GLOBAL_BUFFER const Material *materials,
 	// the radiance found for the ray
 	vec *result) {
 
@@ -520,7 +523,7 @@ static void RadiancePathTracing(
 		}
 
 		// 100% DIFFUSE material
-		if (obj->refl == DIFF) { /* Ideal DIFFUSE reflection */
+		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
 			// should not do the specular bounce... reduces the throughput by the object's color (whatever this is)
 			specularBounce = 0;
 			vmul(throughput, throughput, obj->color);
@@ -573,7 +576,7 @@ static void RadiancePathTracing(
 
 			// finished this ray, let's go shoot the the next one
 			continue;
-		} else if (obj->refl == SPEC) {
+		} else if (obj->material == CONDUCTOR) {
 			// 100% SPECULAR material
 			specularBounce = 1;
 
@@ -582,13 +585,13 @@ static void RadiancePathTracing(
 			vsmul(newDir,  2.f * vdot(normal, currentRay.d), normal);
 			vsub(newDir, currentRay.d, newDir);
 
-			// multiplies the throughput by the object color (whatever that is...)
+			// multiplies the throughput by the object color
 			vmul(throughput, throughput, obj->color);
 
 			// sets up the next ray in the series and shoots it in the scene
 			rinit(currentRay, hitPoint, newDir);
 			continue;
-		} else {
+		} else if (obj->material == DIELECTRIC) {
 			// 100% REFRACTION material
 			specularBounce = 1;
 
@@ -656,6 +659,8 @@ static void RadianceDirectLighting(
 	unsigned int *seed0, unsigned int *seed1,
 	// sky colors
 	const vec sky1, const vec sky2,
+	// materials
+	OCL_GLOBAL_BUFFER const Material *materials,
 	vec *result) {
 
 	Ray currentRay; rassign(currentRay, *startRay);
@@ -722,7 +727,7 @@ static void RadianceDirectLighting(
 			return;
 		}
 
-		if (obj->refl == DIFF) { /* Ideal DIFFUSE reflection */
+		if (obj->material == LAMBERTIAN) { /* Ideal DIFFUSE reflection */
 			specularBounce = 0;
 			vmul(throughput, throughput, obj->color);
 
@@ -735,7 +740,7 @@ static void RadianceDirectLighting(
 
 			*result = rad;
 			return;
-		} else if (obj->refl == SPEC) { /* Ideal SPECULAR reflection */
+		} else if (obj->material == CONDUCTOR) { /* Ideal SPECULAR reflection */
 			specularBounce = 1;
 
 			vec newDir;
@@ -746,7 +751,7 @@ static void RadianceDirectLighting(
 
 			rinit(currentRay, hitPoint, newDir);
 			continue;
-		} else {
+		} else if (obj->material == DIELECTRIC) {
 			specularBounce = 1;
 
 			vec newDir;

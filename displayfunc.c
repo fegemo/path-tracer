@@ -7,9 +7,11 @@
 
 #include "camera.h"
 #include "geom.h"
+#include "material.h"
 #include "displayfunc.h"
 #include "time-utils.h"
 #include "scene.h"
+
 
 #define TINYOBJ_LOADER_C_IMPLEMENTATION
 #include "tinyobj_loader_c.h"
@@ -22,7 +24,7 @@ extern Camera camera;
 extern Object *objects;
 extern unsigned int objectCount;
 extern unsigned int lightCount;
-extern float gammaCorrection;
+extern Material *materials;
 extern Scene scene;
 extern int currentSample;
 extern double startRenderingTime;
@@ -69,8 +71,7 @@ static void renderString(void *font, const char *string) {
 }
 
 /// Removes the extension of a file name
-void stripExtension(char *fileName)
-{
+void stripExtension(char *fileName) {
     char *end = fileName + strlen(fileName);
 
     while (end > fileName && *end != '.' && *end != '\\' && *end != '/') {
@@ -79,6 +80,20 @@ void stripExtension(char *fileName)
 
     if (end > fileName && *end == '.') {
         *end = '\0';
+    }
+}
+
+int getMaterialType(unsigned int id, int lineIndex) {
+    switch (id) {
+        case 0: return LAMBERTIAN;
+        case 1: return CONDUCTOR;
+        case 2: return DIELECTRIC;
+        case 3: return MATTE;
+        case 4: return PLASTIC;
+        case 5: return METAL;
+        default:
+            fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", lineIndex, id);
+            exit(-1);
     }
 }
 
@@ -98,7 +113,7 @@ void readScene(char *fileName) {
 	stripExtension(sceneTitle);
 
 	int c;
-	// line: gamma correction, sky colors
+	// part 1: gamma correction, sky colors
 	c = fscanf(f, "gamma %f  sky1 %f %f %f  sky2 %f %f %f\n", &scene.gammaCorrection,
             &scene.skyColor1.x, &scene.skyColor1.y, &scene.skyColor1.z,
             &scene.skyColor2.x, &scene.skyColor2.y, &scene.skyColor2.z);
@@ -108,7 +123,7 @@ void readScene(char *fileName) {
         vinit(scene.skyColor2, 1.f, 1.f, 1.f);
     }
 
-	// line 1: camera configuration: camera eye.x eye.y eye.z  target.x target.y target.z
+	// part 2: camera configuration: camera eye.x eye.y eye.z  target.x target.y target.z
 	c = fscanf(f,"camera %f %f %f  %f %f %f\n",
 			&camera.orig.x, &camera.orig.y, &camera.orig.z,
 			&camera.target.x, &camera.target.y, &camera.target.z);
@@ -123,23 +138,61 @@ void readScene(char *fileName) {
 		exit(-1);
 	}
 
-	// line 2: object counts: size n
-	c = fscanf(f,"size %u\n", &objectCount);
+	// part 3: material counts: materials n
+	c = fscanf(f, "materials %u\n", &scene.materialCount);
+	if (c < 1) {
+        fprintf(stderr, "Failed to read the number of materials: %d\n", c);
+        exit(-1);
+	}
+
+	// part 4: material descriptors
+	materials = (Material *)malloc(sizeof(Material) * scene.materialCount);
+	unsigned int lineIndex;
+	for (lineIndex = 0; lineIndex < scene.materialCount; lineIndex++) {
+        Material *material = &materials[lineIndex];
+        char materialTypeString[100];
+
+        int readValuesCount = fscanf(f, "%s", materialTypeString);
+        if (readValuesCount != 1) {
+            fprintf(stderr, "Failed to read material description type. Expected 1, found %d value(s)\n", readValuesCount);
+            exit(-1);
+        }
+
+        if (strcmp(materialTypeString, "matte") == 0) {
+            readValuesCount = fscanf(f,"%f %f %f  %f\n",
+                &material->kd.x, &material->kd.y, &material->kd.z,
+                &material->sigma);
+            if (readValuesCount != 4) {
+                fprintf(stderr, "Failed to read matte material descriptor. Expected 4, found %d value(s)\n", readValuesCount);
+                exit(-1);
+            }
+        } else if (strcmp(materialTypeString, "plastic") == 0) {
+            readValuesCount = fscanf(f,"%f %f %f  %f %f %f  %f\n",
+                &material->kd.x, &material->kd.y, &material->kd.z,
+                &material->ks.x, &material->ks.y, &material->ks.z,
+                &material->roughness);
+            if (readValuesCount != 7) {
+                fprintf(stderr, "Failed to read plastic material descriptor. Expected 4, found %d value(s)\n", readValuesCount);
+                exit(-1);
+            }
+        }
+	}
+
+	// part 5: object counts: objects n
+	c = fscanf(f,"objects %u\n", &objectCount);
 	if (c < 1) {
 		fprintf(stderr, "Failed to read object count: %d\n", c);
 		exit(-1);
 	}
 	fprintf(stderr, "Scene size: %d\n", objectCount);
 
-	// line 3+: object descriptors
-//	printf("Allocated objects to have %d positions.\n", objectCount);
+	// part 6: object descriptors
 	objects = (Object *)malloc(sizeof(Object) * objectCount);
-	unsigned int lineIndex;
 	unsigned int addedObjects = 0;
 	lightCount = 0;
 	for (lineIndex = 0; lineIndex < objectCount; lineIndex++) {
         Object *obj = &objects[lineIndex + addedObjects];
-		int mat;
+		unsigned int mat;
 		char objectTypeString[100];
 
 		int readValuesCount = fscanf(f, "%s", objectTypeString);
@@ -152,7 +205,7 @@ void readScene(char *fileName) {
 		if (strcmp(objectTypeString, "sphere") == 0) {
 		    obj->type = SPHERE;
             // line x: sphere     radius  xyz  emission  color  reflection
-            readValuesCount = fscanf(f,"%f  %f %f %f  %f %f %f  %f %f %f  %d\n",
+            readValuesCount = fscanf(f,"%f  %f %f %f  %f %f %f  %f %f %f  %u\n",
 				&obj->radius,
 				&obj->center.x, &obj->center.y, &obj->center.z,
 				&obj->emission.x, &obj->emission.y, &obj->emission.z,
@@ -164,16 +217,7 @@ void readScene(char *fileName) {
                 exit(-1);
             }
 
-            switch (mat) {
-                case 0: obj->refl = DIFF; break;
-                case 1: obj->refl = SPEC; break;
-                case 2: obj->refl = REFR; break;
-                default:
-                    fprintf(stderr, "Failed to read material type for sphere #%d: %d\n", lineIndex, mat);
-                    exit(-1);
-                    break;
-            }
-
+            obj->material = getMaterialType(mat, lineIndex);
             obj->area = 4 * FLOAT_PI * obj->radius*obj->radius;
 
             if (!viszero(obj->emission)) {
@@ -196,24 +240,9 @@ void readScene(char *fileName) {
             }
 //            printf("triangle: %f %f %f   %f %f %f   %f %f %f   %f %f %f   %f %f %f    %d\n",
 //                   obj->p1.x, obj->p1.y, obj->p1.z, obj->p2.x, obj->p2.y, obj->p2.z, obj->p3.x, obj->p3.y, obj->p3.z, obj->emission.x, obj->emission.y, obj->emission.z, obj->color.x, obj->color.y, obj->color.z, obj->refl);
-            switch (mat) {
-                case 0: obj->refl = DIFF; break;
-                case 1: obj->refl = SPEC; break;
-                case 2: obj->refl = REFR; break;
-                    fprintf(stderr, "Failed to read material type for triangle #%d: %d\n", lineIndex, mat);
-                    exit(-1);
-                    break;
-            }
+            obj->material = getMaterialType(mat, lineIndex);
 
 
-            // sets a center of the triangle (in case it's a light source) and its radius
-//            vclr(tri->center)
-//            vadd(tri->center, tri->p1, tri->center);
-//            vadd(tri->center, tri->p2, tri->center);
-//            vadd(tri->center, tri->p3, tri->center);
-//            vsmul(tri->center, 1/3.0f, tri->center);
-
-            // PAREI AQUI..... PREENCHENDO RADIUS PRA VER SE FUNCIONA LUZ RETANGULAR
             // the area of the circle outside the triangle is (abc)/4area
             float a, b, c;
             a = dist(tri->p2, tri->p1);
@@ -223,7 +252,6 @@ void readScene(char *fileName) {
             vec e2; vsub(e2, tri->p3, tri->p1);
             vec normal; vxcross(normal, e1, e2);
             tri->area = norm(normal) * 0.5f;
-//            tri->radius = (a*b*c)/(4*tri->area);
             vnorm(normal);
 
             printf("tri #%d normal: %.2f %.2f %.2f\n", lineIndex + addedObjects, normal.x, normal.y, normal.z);
@@ -253,14 +281,7 @@ void readScene(char *fileName) {
                 exit(-1);
             }
 
-            switch (mat) {
-                case 0: obj->refl = DIFF; break;
-                case 1: obj->refl = SPEC; break;
-                case 2: obj->refl = REFR; break;
-                    fprintf(stderr, "Failed to read material type for model #%d: %d\n", lineIndex, mat);
-                    exit(-1);
-                    break;
-            }
+            obj->material = getMaterialType(mat, lineIndex);
 
             tinyobj_attrib_t attrib;
             tinyobj_shape_t* shapes = NULL;
@@ -300,7 +321,7 @@ void readScene(char *fileName) {
                 tri->type = TRIANGLE;
                 tri->emission = obj->emission;
                 tri->color = obj->color;
-                tri->refl = obj->refl;
+                tri->material = obj->material;
 
                 int idxVertex1 = attrib.faces[faceOffset+0].v_idx;
                 int idxVertex2 = attrib.faces[faceOffset+1].v_idx;

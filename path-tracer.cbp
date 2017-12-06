@@ -11,7 +11,7 @@
 				<Option object_output="build/" />
 				<Option type="1" />
 				<Option compiler="gcc" />
-				<Option parameters="1 0 ray-tracing.cl 640 480 scenes/simple-spheres.txt" />
+				<Option parameters="1 0 path-tracing.cl 640 480 scenes/materials.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -28,7 +28,7 @@
 				<Option type="1" />
 				<Option compiler="gcc" />
 				<Option use_console_runner="0" />
-				<Option parameters="480 320 scenes/cornell-original.txt" />
+				<Option parameters="480 320 scenes/materials.txt" />
 				<Compiler>
 					<Add option="-Wall" />
 					<Add option="-g" />
@@ -68,6 +68,7 @@
 			<Option compilerVar="CC" />
 			<Option target="gpu" />
 		</Unit>
+		<Unit filename="material.h" />
 		<Unit filename="models/cube-rotated-other.obj" />
 		<Unit filename="models/cube-rotated.obj" />
 		<Unit filename="models/cube.mtl" />
@@ -101,11 +102,13 @@
 		<Unit filename="scenes/cornell.txt" />
 		<Unit filename="scenes/cornell_large.txt" />
 		<Unit filename="scenes/large-object.txt" />
+		<Unit filename="scenes/materials.txt" />
 		<Unit filename="scenes/obj-model.txt" />
 		<Unit filename="scenes/simple-spheres.txt" />
 		<Unit filename="scenes/simple.txt" />
 		<Unit filename="scenes/table-and-mirror.txt" />
 		<Unit filename="simplernd.h" />
+		<Unit filename="texture.h" />
 		<Unit filename="time-utils.c">
 			<Option compilerVar="CC" />
 		</Unit>
