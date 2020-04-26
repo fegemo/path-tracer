@@ -932,9 +932,15 @@ int main(int argc, char *argv[]) {
 		useGPU = 1;
 		forceWorkSize = 0;
 		kernelFileName = "path-tracing.cl";
-		width = 480;
-		height = 320;
-		sceneName = "scenes/cornell.txt";
+		// kernelFileName = "ray-tracing.cl";
+		width = 800;
+		height = 600;
+		// sceneName = "scenes/cornell-original.txt";
+		// sceneName = "scenes/simple-spheres.txt";
+		// sceneName = "scenes/obj-model.txt";
+		// sceneName = "scenes/skybox.txt";
+		sceneName = "scenes/stacked-spheres.txt";
+
 	} else {
 		exit(-1);
     }
